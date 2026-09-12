@@ -25,12 +25,13 @@ internal static class PlanParser
     /// </summary>
     public static AnalyzeResult Parse(XDocument doc)
     {
-        var stmt = doc.Descendants(Ns + "StmtSimple").First();
-        var queryPlan = stmt.Descendants(Ns + "QueryPlan").First();
-        var rootRelOp = queryPlan.Element(Ns + "RelOp")!;
-        var rootSubtreeCost = Double(rootRelOp, "EstimatedTotalSubtreeCost");
-
-        var allOps = CollectOperators(rootRelOp, rootSubtreeCost);
+        var stmt = doc.Descendants(Ns + "StmtSimple").FirstOrDefault()
+            ?? throw new InvalidOperationException("The showplan does not contain a SELECT statement.");
+        var queryPlan = stmt.Descendants(Ns + "QueryPlan").FirstOrDefault();
+        var rootRelOp = queryPlan?.Element(Ns + "RelOp");
+        var allOps = rootRelOp is null
+            ? []
+            : CollectOperators(rootRelOp, Double(rootRelOp, "EstimatedTotalSubtreeCost"));
 
         return new AnalyzeResult
         {
@@ -38,17 +39,17 @@ internal static class PlanParser
             Statement = ParseStatement(stmt, queryPlan),
             TopOperators = ParseTopOperators(allOps),
             CardinalityIssues = ParseCardinalityIssues(allOps),
-            Warnings = ParseWarnings(queryPlan, allOps),
-            MissingIndexes = ParseMissingIndexes(queryPlan),
-            WaitStats = ParseWaitStats(queryPlan),
-            Statistics = ParseStatistics(queryPlan),
+            Warnings = queryPlan is null ? [] : ParseWarnings(queryPlan, allOps),
+            MissingIndexes = queryPlan is null ? [] : ParseMissingIndexes(queryPlan),
+            WaitStats = queryPlan is null ? [] : ParseWaitStats(queryPlan),
+            Statistics = queryPlan is null ? [] : ParseStatistics(queryPlan),
         };
     }
 
-    private static StatementSummary ParseStatement(XElement stmt, XElement queryPlan)
+    private static StatementSummary ParseStatement(XElement stmt, XElement? queryPlan)
     {
-        var memoryGrant = queryPlan.Element(Ns + "MemoryGrantInfo");
-        var queryTime = queryPlan.Element(Ns + "QueryTimeStats");
+        var memoryGrant = queryPlan?.Element(Ns + "MemoryGrantInfo");
+        var queryTime = queryPlan?.Element(Ns + "QueryTimeStats");
 
         return new StatementSummary
         {
@@ -59,8 +60,8 @@ internal static class PlanParser
             QueryHash = Str(stmt, "QueryHash"),
             PlanHash = Str(stmt, "QueryPlanHash"),
             BatchModeOnRowStore = Bool(stmt, "BatchModeOnRowStoreUsed"),
-            DegreeOfParallelism = NullableInt(queryPlan, "DegreeOfParallelism"),
-            NonParallelReason = Str(queryPlan, "NonParallelPlanReason"),
+            DegreeOfParallelism = queryPlan is not null ? NullableInt(queryPlan, "DegreeOfParallelism") : null,
+            NonParallelReason = queryPlan is not null ? Str(queryPlan, "NonParallelPlanReason") : null,
             CpuTimeMs = queryTime is not null ? NullableInt(queryTime, "CpuTime") : null,
             ElapsedTimeMs = queryTime is not null ? NullableInt(queryTime, "ElapsedTime") : null,
             MemoryGrant = memoryGrant is not null ? ParseMemoryGrant(memoryGrant) : null,

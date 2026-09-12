@@ -34,6 +34,15 @@ public class PlanParserTests
         </ShowPlanXML>
         """;
 
+    private const string ConstantSelectPlanXml = """
+        <?xml version="1.0" encoding="utf-16"?>
+        <ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.5" Build="15.0.4480.2">
+          <BatchSequence><Batch><Statements>
+            <StmtSimple StatementEstRows="1" StatementOptmLevel="TRIVIAL" StatementSubTreeCost="0" StatementType="SELECT WITHOUT QUERY" />
+          </Statements></Batch></BatchSequence>
+        </ShowPlanXML>
+        """;
+
     // --- Statement ---
 
     [Fact]
@@ -81,6 +90,33 @@ public class PlanParserTests
         Assert.Null(result.Statement.MemoryGrant);
         Assert.Equal("TRIVIAL", result.Statement.OptimizationLevel);
         Assert.Equal(160, result.Statement.CeVersion);
+    }
+
+    [Fact]
+    public void ParseStatement_ConstantSelect_WithoutQueryPlan_Returns_Empty_Details()
+    {
+        var result = ParseInline(ConstantSelectPlanXml);
+
+        Assert.Equal(1, result.Statement.EstimatedRows);
+        Assert.Equal("TRIVIAL", result.Statement.OptimizationLevel);
+        Assert.Empty(result.TopOperators);
+        Assert.Empty(result.CardinalityIssues);
+        Assert.Empty(result.Warnings);
+        Assert.Empty(result.MissingIndexes);
+        Assert.Empty(result.WaitStats);
+        Assert.Empty(result.Statistics);
+    }
+
+    [Fact]
+    public void Parse_Without_Select_Statement_Throws_Clear_Error()
+    {
+        const string xml = """
+            <ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" />
+            """;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => ParseInline(xml));
+
+        Assert.Contains("SELECT statement", exception.Message, StringComparison.Ordinal);
     }
 
     // --- Top Operators ---
