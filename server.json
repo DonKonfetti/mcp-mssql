@@ -65,7 +65,7 @@
         },
         {
           "name": "MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS",
-          "description": "Execution plan analysis timeout in seconds (default 300).",
+          "description": "Execution plan analysis timeout in seconds (default 300; ceiling 600).",
           "isRequired": false,
           "format": "number",
           "isSecret": false
