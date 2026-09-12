@@ -1,29 +1,22 @@
-﻿// MIT License
+// MIT License
 
-using System.Text;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 
 namespace Alyio.McpMssql.Internal;
 
 /// <summary>
-/// Validates that a SQL statement is read-only and safe to execute
-/// in the MCP query engine.
+/// Validates that a SQL statement is a single, read-only SELECT query.
 /// </summary>
-/// <remarks>
-/// This validator is intentionally conservative. It is not a full
-/// SQL parser, but it reliably blocks all common write paths while
-/// avoiding false positives caused by string literals or identifiers.
-/// </remarks>
 internal static class SqlReadOnlyValidator
 {
     /// <summary>
-    /// Validates that the provided SQL text represents a single,
-    /// read-only SELECT query.
+    /// Parses and validates the provided T-SQL text.
     /// </summary>
     /// <exception cref="ArgumentException">
     /// Thrown when the SQL is null or empty.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the SQL is not a read-only SELECT query.
+    /// Thrown when the SQL is invalid or is not a read-only SELECT query.
     /// </exception>
     public static void Validate(string sql)
     {
@@ -32,166 +25,97 @@ internal static class SqlReadOnlyValidator
             throw new ArgumentException("SQL query cannot be empty.", nameof(sql));
         }
 
-        var normalized = StripComments(sql).Trim();
+        // Newest grammar, with SqlEngineType.All left at its default, so
+        // validation never rejects syntax the target server would accept.
+        // The server stays the authority on what it can actually execute.
+        var parser = new TSql180Parser(initialQuotedIdentifiers: true);
+        TSqlFragment fragment;
 
-        // Allow a single trailing semicolon
-        if (normalized.EndsWith(';'))
+        using (var reader = new StringReader(sql))
         {
-            normalized = normalized[..^1].TrimEnd();
+            fragment = parser.Parse(reader, out IList<ParseError> errors);
+
+            if (errors.Count > 0)
+            {
+                ParseError first = errors[0];
+                throw new InvalidOperationException(
+                    $"Invalid T-SQL at line {first.Line}, column {first.Column}: {first.Message}");
+            }
         }
 
-        // Disallow multiple statements
-        if (normalized.Contains(';'))
+        if (fragment is not TSqlScript { Batches.Count: 1 } script
+            || script.Batches[0].Statements is not [SelectStatement select])
         {
             throw new InvalidOperationException(
-                "Multiple SQL statements are not allowed.");
+                "Only one read-only SELECT statement is allowed.");
         }
 
-        var executable = StripNonExecutableContent(normalized);
+        var visitor = new ReadOnlyViolationVisitor();
+        select.Accept(visitor);
 
-        if (!StartsWithSelectOrCte(executable))
+        if (visitor.Violation is not null)
         {
-            throw new InvalidOperationException(
-                "Only read-only SELECT queries are allowed.");
-        }
-
-        if (ContainsForbiddenKeywords(executable))
-        {
-            throw new InvalidOperationException(
-                "The query contains forbidden SQL operations.");
+            throw new InvalidOperationException(visitor.Violation);
         }
     }
 
-    private static bool StartsWithSelectOrCte(string sql)
+    private sealed class ReadOnlyViolationVisitor : TSqlFragmentVisitor
     {
-        var trimmed = sql.TrimStart();
+        public string? Violation { get; private set; }
 
-        if (trimmed.StartsWith("select", StringComparison.OrdinalIgnoreCase))
+        public override void Visit(TSqlFragment node)
         {
-            return true;
+            if (node is AdHocTableReference
+                or OpenQueryTableReference
+                or OpenRowsetTableReference
+                or InternalOpenRowset
+                or OpenRowsetCosmos
+                or BulkOpenRowset)
+            {
+                Reject("Ad-hoc external data sources are not allowed.");
+            }
+
+            base.Visit(node);
         }
 
-        // CTEs are allowed only if they ultimately execute a SELECT
-        if (trimmed.StartsWith("with", StringComparison.OrdinalIgnoreCase)
-            && trimmed.Contains("select", StringComparison.OrdinalIgnoreCase))
+        public override void ExplicitVisit(SelectStatement node)
         {
-            return true;
+            if (node.Into is not null)
+            {
+                Reject("SELECT INTO is not allowed.");
+            }
+
+            base.ExplicitVisit(node);
         }
 
-        return false;
-    }
-
-    private static bool ContainsForbiddenKeywords(string sql)
-    {
-        var text = sql.ToLowerInvariant();
-
-        var forbidden = new[]
+        public override void ExplicitVisit(SelectSetVariable node)
         {
-            " insert ",
-            " update ",
-            " delete ",
-            " merge ",
-            " exec ",
-            " execute ",
-            " create ",
-            " alter ",
-            " drop ",
-            " truncate ",
-            " grant ",
-            " revoke ",
-            " into "
-        };
-
-        return forbidden.Any(text.Contains);
-    }
-
-    /// <summary>
-    /// Removes string literals and delimited identifiers so that
-    /// keyword detection only applies to executable SQL tokens.
-    /// </summary>
-    private static string StripNonExecutableContent(string sql)
-    {
-        var sb = new StringBuilder(sql.Length);
-
-        bool inString = false;
-        bool inBracket = false;
-        bool inQuotedIdentifier = false;
-
-        for (int i = 0; i < sql.Length; i++)
-        {
-            char c = sql[i];
-
-            if (!inBracket && !inQuotedIdentifier && c == '\'')
-            {
-                inString = !inString;
-                continue;
-            }
-
-            if (!inString && !inQuotedIdentifier)
-            {
-                if (c == '[')
-                {
-                    inBracket = true;
-                    continue;
-                }
-
-                if (c == ']')
-                {
-                    inBracket = false;
-                    continue;
-                }
-            }
-
-            if (!inString && !inBracket && c == '"')
-            {
-                inQuotedIdentifier = !inQuotedIdentifier;
-                continue;
-            }
-
-            if (inString || inBracket || inQuotedIdentifier)
-            {
-                continue;
-            }
-
-            sb.Append(c);
+            Reject("Assigning variables in SELECT is not allowed.");
+            base.ExplicitVisit(node);
         }
 
-        return sb.ToString();
-    }
-
-    /// <summary>
-    /// Removes SQL line and block comments.
-    /// </summary>
-    private static string StripComments(string sql)
-    {
-        var sb = new StringBuilder(sql.Length);
-
-        for (int i = 0; i < sql.Length; i++)
+        public override void ExplicitVisit(NextValueForExpression node)
         {
-            if (i + 1 < sql.Length && sql[i] == '-' && sql[i + 1] == '-')
-            {
-                while (i < sql.Length && sql[i] != '\n')
-                {
-                    i++;
-                }
-                continue;
-            }
-
-            if (i + 1 < sql.Length && sql[i] == '/' && sql[i + 1] == '*')
-            {
-                i += 2;
-                while (i + 1 < sql.Length &&
-                       !(sql[i] == '*' && sql[i + 1] == '/'))
-                {
-                    i++;
-                }
-                i++;
-                continue;
-            }
-
-            sb.Append(sql[i]);
+            Reject("NEXT VALUE FOR is not allowed because it changes sequence state.");
+            base.ExplicitVisit(node);
         }
 
-        return sb.ToString();
+        public override void ExplicitVisit(TableHint node)
+        {
+            if (node.HintKind is TableHintKind.HoldLock
+                or TableHintKind.TabLockX
+                or TableHintKind.UpdLock
+                or TableHintKind.XLock)
+            {
+                Reject($"The {node.HintKind} locking hint is not allowed.");
+            }
+
+            base.ExplicitVisit(node);
+        }
+
+        private void Reject(string message)
+        {
+            Violation ??= message;
+        }
     }
 }

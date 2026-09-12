@@ -15,6 +15,8 @@ public class SqlReadOnlyValidatorTests
     [InlineData("select 'insert into table' as Value")]
     [InlineData("select [insert] from [table]")]
     [InlineData("select \"delete\" from \"table\"")]
+    [InlineData("select '--' as Value")]
+    [InlineData("select '/* not a comment */' as Value")]
     public void Validate_Allows_ReadOnly_Select_Queries(string sql)
     {
         // Act / Assert
@@ -42,6 +44,14 @@ public class SqlReadOnlyValidatorTests
     [InlineData("exec SomeProc")]
     [InlineData("execute SomeProc")]
     [InlineData("select * into TempTable from Users")]
+    [InlineData("select *\ninto TempTable\nfrom Users")]
+    [InlineData("select next value for dbo.SequenceName")]
+    [InlineData("select @value = Id from Users")]
+    [InlineData("select * from openrowset('SQLNCLI', 'Server=example;Trusted_Connection=yes;', 'select 1')")]
+    [InlineData("select * from Users with (updlock)")]
+    [InlineData("select * from Users with (xlock)")]
+    [InlineData("select * from Users with (tablockx)")]
+    [InlineData("select * from Users with (holdlock)")]
     public void Validate_Throws_For_Forbidden_Keywords(string sql)
     {
         Assert.Throws<InvalidOperationException>(() =>
@@ -53,6 +63,17 @@ public class SqlReadOnlyValidatorTests
     {
         var sql = "select * from Users; select * from Orders";
 
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlReadOnlyValidator.Validate(sql));
+    }
+
+    [Theory]
+    [InlineData("select '--'; update Users set Name = 'x'")]
+    [InlineData("select '/*'; delete from Users; /* */")]
+    [InlineData("select 1\nupdate\nUsers set Name = 'x'")]
+    [InlineData("select 1\tdelete\tfrom Users")]
+    public void Validate_Throws_For_Obfuscated_Write_Batches(string sql)
+    {
         Assert.Throws<InvalidOperationException>(() =>
             SqlReadOnlyValidator.Validate(sql));
     }
