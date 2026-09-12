@@ -75,6 +75,8 @@ export MCPMSSQL_WRITE_COMMAND_TIMEOUT_SECONDS="60"
 
 **Multiple connections:** Use the user-scoped `appsettings.json` file (recommended). Env vars also work via .NET host conventions (`MCPMSSQL__PROFILES__<NAME>__CONNECTIONSTRING`, etc.).
 
+For security, configuration files in the current working directory are ignored.
+
 - Unix-like: `~/.config/mcp-mssql/appsettings.json`
 - Windows: `%USERPROFILE%\.config\mcp-mssql\appsettings.json`
 
