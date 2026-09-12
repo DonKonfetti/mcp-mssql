@@ -72,6 +72,41 @@ public class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_Uses_Private_Unix_Permissions()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var id = await _store.SaveAsync(SampleCsv, CancellationToken);
+        var snapshotPath = Path.Combine(_snapshotsDirectory, $"{id}{SnapshotFileExtension}");
+
+        Assert.Equal(
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute,
+            File.GetUnixFileMode(_snapshotsDirectory));
+        Assert.Equal(
+            UnixFileMode.UserRead | UnixFileMode.UserWrite,
+            File.GetUnixFileMode(snapshotPath));
+    }
+
+    [Fact]
+    public async Task Save_Deletes_Files_That_Expired_After_Initial_Load()
+    {
+        var expiredId = await _store.SaveAsync(SampleCsv, CancellationToken);
+        var expiredPath = Path.Combine(
+            _snapshotsDirectory,
+            $"{expiredId}{SnapshotFileExtension}");
+        File.SetLastWriteTimeUtc(
+            expiredPath,
+            DateTime.UtcNow - SnapshotStore.Ttl - TimeSpan.FromDays(1));
+
+        await _store.SaveAsync(SampleCsv, CancellationToken);
+
+        Assert.False(File.Exists(expiredPath));
+    }
+
+    [Fact]
     public async Task TryGet_Returns_Null_And_Deletes_Expired_Snapshot_File_On_Initial_Load()
     {
         var id = await _store.SaveAsync(SampleCsv, CancellationToken);
@@ -86,7 +121,7 @@ public class SnapshotStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task TryGet_Loads_Existing_Snapshot_Into_Memory()
+    public async Task TryGet_Returns_Null_When_Backing_Snapshot_Is_Removed()
     {
         const string id = "deadbeef";
         var snapshotPath = Path.Combine(_snapshotsDirectory, $"{id}{SnapshotFileExtension}");
@@ -100,7 +135,32 @@ public class SnapshotStoreTests : IDisposable
         File.Delete(snapshotPath);
         var result = await reloaded.TryGetAsync(id, CancellationToken);
 
-        Assert.Equal(SampleCsv, result);
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("../deadbeef")]
+    [InlineData("DEADBEEF")]
+    [InlineData("deadbee")]
+    [InlineData("deadbeeg")]
+    public async Task TryGet_Rejects_Invalid_Ids(string id)
+    {
+        var result = await _store.TryGetAsync(id, CancellationToken);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task TryGet_Evicts_Expired_Snapshot_From_Current_Instance()
+    {
+        var id = await _store.SaveAsync(SampleCsv, CancellationToken);
+        var snapshotPath = Path.Combine(_snapshotsDirectory, $"{id}{SnapshotFileExtension}");
+        File.SetLastWriteTimeUtc(snapshotPath, DateTime.UtcNow - SnapshotStore.Ttl - TimeSpan.FromDays(1));
+
+        var result = await _store.TryGetAsync(id, CancellationToken);
+
+        Assert.Null(result);
+        Assert.False(File.Exists(snapshotPath));
     }
 
     [Fact]

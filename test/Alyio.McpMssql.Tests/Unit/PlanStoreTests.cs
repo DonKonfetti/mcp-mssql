@@ -86,7 +86,7 @@ public class PlanStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task TryGet_Loads_Existing_Plan_Into_Memory()
+    public async Task TryGet_Returns_Null_When_Backing_Plan_Is_Removed()
     {
         const string id = "deadbeef";
         var planPath = Path.Combine(_plansDirectory, $"{id}{PlanFileExtension}");
@@ -100,7 +100,32 @@ public class PlanStoreTests : IDisposable
         File.Delete(planPath);
         var result = await reloaded.TryGetAsync(id, CancellationToken);
 
-        Assert.Equal(SampleXml, result);
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("../deadbeef")]
+    [InlineData("DEADBEEF")]
+    [InlineData("deadbee")]
+    [InlineData("deadbeeg")]
+    public async Task TryGet_Rejects_Invalid_Ids(string id)
+    {
+        var result = await _store.TryGetAsync(id, CancellationToken);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task TryGet_Evicts_Expired_Plan_From_Current_Instance()
+    {
+        var id = await _store.SaveAsync(SampleXml, CancellationToken);
+        var planPath = Path.Combine(_plansDirectory, $"{id}{PlanFileExtension}");
+        File.SetLastWriteTimeUtc(planPath, DateTime.UtcNow - PlanStore.Ttl - TimeSpan.FromDays(1));
+
+        var result = await _store.TryGetAsync(id, CancellationToken);
+
+        Assert.Null(result);
+        Assert.False(File.Exists(planPath));
     }
 
     [Fact]

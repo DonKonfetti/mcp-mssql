@@ -64,6 +64,7 @@ internal abstract partial class ContentStore : IContentStore
         cancellationToken.ThrowIfCancellationRequested();
 
         var memoryStore = _memoryStore.Value;
+        PruneExpiredFiles(memoryStore);
 
         while (true)
         {
@@ -74,7 +75,7 @@ internal abstract partial class ContentStore : IContentStore
 
             try
             {
-                await File.WriteAllTextAsync(tempPath, content, cancellationToken).ConfigureAwait(false);
+                await WriteSecureFileAsync(tempPath, content, cancellationToken).ConfigureAwait(false);
                 File.Move(tempPath, finalPath);
 
                 memoryStore[id] = content;
@@ -103,23 +104,25 @@ internal abstract partial class ContentStore : IContentStore
 
     public async Task<string?> TryGetAsync(string id, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (!IsValidId(id))
         {
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         var memoryStore = _memoryStore.Value;
+        var filePath = GetFilePath(id);
+
+        if (!TryGetExpiryUtc(filePath, out _, DateTime.UtcNow))
+        {
+            memoryStore.TryRemove(id, out _);
+            TryDeleteFile(filePath);
+            return null;
+        }
 
         if (memoryStore.TryGetValue(id, out var inMemory))
         {
             return inMemory;
-        }
-
-        var filePath = GetFilePath(id);
-        if (!File.Exists(filePath))
-        {
-            return null;
         }
 
         try
@@ -143,7 +146,7 @@ internal abstract partial class ContentStore : IContentStore
     private ConcurrentDictionary<string, string> LoadExistingIntoMemory()
     {
         var memoryStore = new ConcurrentDictionary<string, string>();
-        Directory.CreateDirectory(_directory);
+        CreateSecureDirectory();
 
         IEnumerable<string> files;
         try
@@ -179,6 +182,7 @@ internal abstract partial class ContentStore : IContentStore
 
             try
             {
+                SetSecureFileMode(file);
                 var content = File.ReadAllText(file);
                 memoryStore[id] = content;
             }
@@ -224,6 +228,69 @@ internal abstract partial class ContentStore : IContentStore
     private string GetFilePath(string id)
         => Path.Combine(_directory, $"{id}{_fileExtension}");
 
+    private static async Task WriteSecureFileAsync(
+        string path,
+        string content,
+        CancellationToken cancellationToken)
+    {
+        var options = new FileStreamOptions
+        {
+            Access = FileAccess.Write,
+            Mode = FileMode.CreateNew,
+            Share = FileShare.None,
+            Options = FileOptions.Asynchronous,
+        };
+
+        if (!OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        await using var stream = new FileStream(path, options);
+        await using var writer = new StreamWriter(stream);
+        await writer.WriteAsync(content.AsMemory(), cancellationToken).ConfigureAwait(false);
+    }
+
+    private void CreateSecureDirectory()
+    {
+        Directory.CreateDirectory(_directory);
+
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                _directory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    private static void SetSecureFileMode(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    private void PruneExpiredFiles(ConcurrentDictionary<string, string> memoryStore)
+    {
+        var now = DateTime.UtcNow;
+        foreach (var file in Directory.EnumerateFiles(_directory, $"*{_fileExtension}"))
+        {
+            if (TryGetExpiryUtc(file, out _, now))
+            {
+                continue;
+            }
+
+            var id = TryGetId(file);
+            if (id is not null)
+            {
+                memoryStore.TryRemove(id, out _);
+            }
+
+            TryDeleteFile(file);
+        }
+    }
+
     private void TryDeleteFile(string path)
     {
         try
@@ -251,7 +318,14 @@ internal abstract partial class ContentStore : IContentStore
             return null;
         }
 
-        return name[..^_fileExtension.Length];
+        var id = name[..^_fileExtension.Length];
+        return IsValidId(id) ? id : null;
+    }
+
+    private static bool IsValidId(string? id)
+    {
+        return id is { Length: 8 }
+            && id.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
     }
 
     private static string GetDefaultDirectory(string cacheRelativePath)
