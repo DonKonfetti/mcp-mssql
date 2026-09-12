@@ -21,6 +21,7 @@ public static class QueryTools
     [Description(
         "[MSSQL] Execute Read-only T-SQL SELECT and return tabular results. " +
         "Results are bounded by server-enforced limits; only SELECT is allowed (no DML/DDL). " +
+        "Inline results are capped at 10 MiB, snapshots at 50 MiB, and individual values at 1 MiB. " +
         "Use TOP or OFFSET-FETCH for pagination. " +
         "Use snapshot=true for large/reporting queries — returns a resource URI instead of inline rows. " +
         "Prefer analyze_query when tuning plans.")]

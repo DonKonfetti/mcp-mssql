@@ -1,6 +1,8 @@
 // MIT License
 
 using System.Data;
+using Alyio.McpMssql.Configuration;
+using Alyio.McpMssql.Internal;
 using Alyio.McpMssql.Models;
 using Microsoft.Data.SqlClient;
 
@@ -32,7 +34,11 @@ internal static class SqlConnectionExtensions
         do
         {
             var columns = reader.ReadColumns();
-            var (rows, _) = await reader.ReadRowsAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+            var (rows, _) = await reader.ReadRowsAsync(
+                int.MaxValue,
+                QueryOptions.HardSnapshotResultByteLimit,
+                QueryOptions.HardCellByteLimit,
+                cancellationToken).ConfigureAwait(false);
             results.Add(new TabularResult { Columns = columns, Rows = rows });
         }
         while (await reader.NextResultAsync(cancellationToken).ConfigureAwait(false));
@@ -54,7 +60,11 @@ internal static class SqlConnectionExtensions
         using var reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
         var columns = reader.ReadColumns();
-        var (rows, _) = await reader.ReadRowsAsync(int.MaxValue, cancellationToken).ConfigureAwait(false);
+        var (rows, _) = await reader.ReadRowsAsync(
+            int.MaxValue,
+            QueryOptions.HardSnapshotResultByteLimit,
+            QueryOptions.HardCellByteLimit,
+            cancellationToken).ConfigureAwait(false);
 
         return new TabularResult
         {
@@ -72,10 +82,13 @@ internal static class SqlConnectionExtensions
         string sql,
         IReadOnlyList<SqlParameter>? parameters,
         int rowLimit,
+        int resultByteLimit,
+        int cellByteLimit,
         int commandTimeoutSeconds,
         CancellationToken cancellationToken)
     {
         using var cmd = connection.CreateCommand(sql, parameters);
+        cmd.CommandText = $"SET TEXTSIZE {cellByteLimit};\n{sql}";
         cmd.CommandTimeout = commandTimeoutSeconds;
 
         using var reader = await cmd.ExecuteReaderAsync(cancellationToken)
@@ -83,7 +96,7 @@ internal static class SqlConnectionExtensions
 
         var columns = reader.ReadColumns();
         var (rows, truncated) = await reader
-            .ReadRowsAsync(rowLimit, cancellationToken)
+            .ReadRowsAsync(rowLimit, resultByteLimit, cellByteLimit, cancellationToken)
             .ConfigureAwait(false);
 
         return new SelectResult(columns, rows, truncated, rowLimit);
@@ -104,11 +117,14 @@ internal static class SqlConnectionExtensions
     private static async Task<(IReadOnlyList<object?[]> Rows, bool Truncated)> ReadRowsAsync(
         this SqlDataReader reader,
         int rowLimit,
+        int resultByteLimit,
+        int cellByteLimit,
         CancellationToken cancellationToken)
     {
         var rows = new List<object?[]>();
         var fieldCount = reader.FieldCount;
         var truncated = false;
+        long resultBytes = 0;
 
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
@@ -128,6 +144,12 @@ internal static class SqlConnectionExtensions
                 {
                     values[i] = null;
                 }
+
+                resultBytes = QueryResultSizeGuard.AddValue(
+                    resultBytes,
+                    values[i],
+                    resultByteLimit,
+                    cellByteLimit);
             }
 
             rows.Add(values);
@@ -142,7 +164,7 @@ internal static class SqlConnectionExtensions
     private static SqlCommand CreateCommand(this SqlConnection connection, string sql, IReadOnlyList<SqlParameter>? parameters)
     {
         var cmd = connection.CreateCommand();
-        cmd.CommandText = sql;
+        cmd.CommandText = $"SET TEXTSIZE {QueryOptions.HardCellByteLimit};\n{sql}";
 
         if (parameters is { Count: > 0 })
         {

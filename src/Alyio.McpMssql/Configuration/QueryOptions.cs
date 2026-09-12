@@ -55,4 +55,19 @@ public sealed class QueryOptions
     /// Absolute, non-configurable hard limit for snapshot query execution time.
     /// </summary>
     internal const int HardSnapshotCommandTimeoutSeconds = 300;
+
+    /// <summary>
+    /// Absolute maximum UTF-8 payload size for an inline query result.
+    /// </summary>
+    internal const int HardResultByteLimit = 10 * 1024 * 1024;
+
+    /// <summary>
+    /// Absolute maximum UTF-8 payload size for a snapshot query result.
+    /// </summary>
+    internal const int HardSnapshotResultByteLimit = 50 * 1024 * 1024;
+
+    /// <summary>
+    /// Absolute maximum size for one textual or binary result value.
+    /// </summary>
+    internal const int HardCellByteLimit = 1024 * 1024;
 }

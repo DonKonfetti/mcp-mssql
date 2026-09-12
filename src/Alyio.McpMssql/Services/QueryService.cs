@@ -1,6 +1,7 @@
 // MIT License
 
 using System.Xml.Linq;
+using Alyio.McpMssql.Configuration;
 using Alyio.McpMssql.Internal;
 using Alyio.McpMssql.Models;
 using Microsoft.Data.SqlClient;
@@ -42,10 +43,14 @@ internal sealed class QueryService(
                 sql,
                 sqlParameters,
                 rowLimit,
+                QueryOptions.HardSnapshotResultByteLimit,
+                QueryOptions.HardCellByteLimit,
                 timeoutSeconds,
                 cancellationToken).ConfigureAwait(false);
 
-            var csv = CsvSerializer.Serialize(raw.Columns, raw.Rows);
+            var csv = QueryResultSizeGuard.SerializeCsv(
+                raw,
+                QueryOptions.HardSnapshotResultByteLimit);
             var id = await snapshotStore.SaveAsync(csv, cancellationToken).ConfigureAwait(false);
 
             return new QueryResult
@@ -65,10 +70,14 @@ internal sealed class QueryService(
                 sql,
                 sqlParameters,
                 rowLimit,
+                QueryOptions.HardResultByteLimit,
+                QueryOptions.HardCellByteLimit,
                 timeoutSeconds,
                 cancellationToken).ConfigureAwait(false);
 
-            var csv = CsvSerializer.Serialize(raw.Columns, raw.Rows);
+            var csv = QueryResultSizeGuard.SerializeCsv(
+                raw,
+                QueryOptions.HardResultByteLimit);
 
             return new QueryResult
             {
@@ -231,4 +240,5 @@ internal sealed class QueryService(
             }
         }
     }
+
 }
