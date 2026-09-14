@@ -302,6 +302,12 @@ Data API Builder (DAB) is a full REST/GraphQL API with CRUD and auth. This proje
 
 The fit is good; adoption is the blocker. Tasks is an opt-in extension (`io.modelcontextprotocol/tasks`) that a server may only use when the client declares support in its per-request capabilities, and no client currently lists it in the [extension support matrix](https://modelcontextprotocol.io/extensions/client-matrix). Deferred until clients ship support.
 
+## Schema compatibility
+
+Nullable members emit a JSON Schema union type — `"type": ["string", "null"]` — because that is what `System.Text.Json` produces for `string?` and friends. It is legal JSON Schema 2020-12 and permitted by the MCP spec. MCP Inspector warns on the form, on the grounds that some MCP clients read `type` as a single string; whether that rule still has evidence behind it is [under review upstream](https://github.com/modelcontextprotocol/inspector/issues/2286). Rewriting to `anyOf` is not a clear win: OpenAI documents the union form for optional parameters, Anthropic supports `anyOf` and not type arrays, and Cursor, Gemini, and Azure AI Foundry reject `anyOf`.
+
+Nothing is lost by ignoring the null branch. This server never serializes null — absent members are omitted rather than sent as `null` — and no nullable member appears in a `required` list, so a client that reads only the first type in the union gets the exact contract. Left as the SDK emits it; revisit if the SDK changes or the rule settles.
+
 ## Contributing
 
 Open issues or PRs; follow existing style and add tests where appropriate.
