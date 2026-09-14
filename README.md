@@ -6,79 +6,85 @@
 [![NuGet Version](https://img.shields.io/nuget/v/Alyio.McpMssql.svg)](https://www.nuget.org/packages/Alyio.McpMssql)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized SELECT queries, it exposes **execution-plan analysis**: `analyze_query` returns cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves multiple connections from a single server.
+A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Enables AI agents to discover schemas, execute parameterized SELECT queries, analyze execution plans, and optionally execute write operations (DDL/DML).
 
-The query tools enforce SELECT-only (no DML/DDL); an optional `run_command` tool can execute arbitrary write T-SQL, but only on profiles that explicitly opt in via `AllowWrite` (locked off by default).
+Query tools enforce SELECT-only statements (no DML/DDL mutations). An optional `run_command` tool can execute arbitrary write T-SQL, but only on profiles that explicitly opt in via `AllowWrite` configuration (disabled by default for safety).
 
-**Requirements:** .NET 8.0 or later runtime (the tool targets `net8.0` and `net10.0`), SQL Server, and a connection string. Building from source requires the .NET 10.0 SDK.
+**Requirements:** .NET 8.0+ runtime (targets `net8.0` and `net10.0`), SQL Server instance, and a connection string. Building from source requires .NET 10.0 SDK.
 
-## Quick start
+## Quick Start
 
-Set `MCPMSSQL_CONNECTION_STRING` and run the server in one of these ways:
+Set the `MCPMSSQL_CONNECTION_STRING` environment variable and choose a deployment method:
+
+### Option 1: Run from NuGet package with MCP Inspector
 
 ```bash
-# Option 1: Run from NuGet package (e.g. with MCP Inspector)
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
 npx -y @modelcontextprotocol/inspector@latest dotnet dnx Alyio.McpMssql --prerelease
 ```
 
+### Option 2: Install as a global .NET tool
+
 ```bash
-# Option 2: Install and run as a global tool
 dotnet tool install --global Alyio.McpMssql --prerelease
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
 npx -y @modelcontextprotocol/inspector@latest mcp-mssql
 ```
 
+### Option 3: Run from source
+
 ```bash
-# Option 3: Run from source (clone repo, then)
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
 npx -y @modelcontextprotocol/inspector@latest dotnet run --project src/Alyio.McpMssql -f net10.0
 ```
 
-Use `--prerelease` for pre-release builds.
+Use `--prerelease` flag for pre-release builds.
 
 ## Configuration
 
-All settings use the **MCPMSSQL** prefix. **Flat** environment variables (e.g. `MCPMSSQL_CONNECTION_STRING`) are the straightforward way to configure the **default** profile when you have a single connection. For multiple profiles, the user-scoped `appsettings.json` file is recommended.
+All settings use the **MCPMSSQL** prefix. Flat environment variables (e.g., `MCPMSSQL_CONNECTION_STRING`) configure the default profile for single-connection setups. For multiple connections, use a configuration file.
 
-**Single connection:** Configure via environment variables.
+### Single Connection via Environment Variables
 
 ```bash
-# Connection string (required).
+# Connection string (required)
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
 
-# Optional description for the default profile (tooling/AI discovery).
+# Description for the default profile (optional, used for tooling/AI discovery)
 export MCPMSSQL_DESCRIPTION="Primary connection"
 
-# Optional max rows per interactive query (default `500`; hard ceiling `1000`).
+# Max rows per interactive query (default: 500, hard ceiling: 1000)
 export MCPMSSQL_QUERY_MAX_ROWS="500"
 
-# Optional query timeout in seconds (default `30`).
+# Query timeout in seconds (default: 30)
 export MCPMSSQL_QUERY_COMMAND_TIMEOUT_SECONDS="60"
 
-# Optional max rows for snapshot queries (default `10000`; hard ceiling `50000`).
+# Max rows for snapshot queries (default: 10000, hard ceiling: 50000)
 export MCPMSSQL_QUERY_SNAPSHOT_MAX_ROWS="10000"
 
-# Optional snapshot query timeout in seconds (default `120`).
+# Snapshot query timeout in seconds (default: 120)
 export MCPMSSQL_QUERY_SNAPSHOT_COMMAND_TIMEOUT_SECONDS="120"
 
-# Optional analyze timeout in seconds (default `300`; hard ceiling `600`).
+# Execution plan analysis timeout in seconds (default: 300, hard ceiling: 600)
 export MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS="300"
 
-# Optional: enable write commands (DDL/DML) via run_command (default `false`).
-# Soft guard only — prefer a db_datareader login for a hard read-only guarantee.
+# Enable write commands via run_command (default: false, soft guard only)
+# For hard read-only guarantee, connect with a db_datareader login
 export MCPMSSQL_ALLOW_WRITE="false"
 
-# Optional write command timeout in seconds (default `60`; hard ceiling `600`).
+# Write command timeout in seconds (default: 60, hard ceiling: 600)
 export MCPMSSQL_WRITE_COMMAND_TIMEOUT_SECONDS="60"
 ```
 
-**Multiple connections:** Use the user-scoped `appsettings.json` file (recommended). Env vars also work via .NET host conventions (`MCPMSSQL__PROFILES__<NAME>__CONNECTIONSTRING`, etc.).
+### Multiple Connections via Configuration File
 
+Use the user-scoped `appsettings.json` file (recommended for multiple profiles). Environment variables also work via .NET host conventions (e.g., `MCPMSSQL__PROFILES__<NAME>__CONNECTIONSTRING`).
+
+**File locations:**
 - Unix-like: `~/.config/mcp-mssql/appsettings.json`
 - Windows: `%USERPROFILE%\.config\mcp-mssql\appsettings.json`
 
-Example (`appsettings.json`):
+**Example configuration:**
 
 ```json
 {
@@ -114,69 +120,76 @@ Example (`appsettings.json`):
 }
 ```
 
-Values above a hard ceiling are clamped to it at startup, and each adjustment is logged as a warning on stderr.
+Configuration values exceeding hard ceilings are automatically clamped at startup with warnings logged to stderr.
 
-**Local development:** Store the connection string in user-secrets, then run with `DOTNET_ENVIRONMENT=Development` so secrets load.
+### Local Development with Secrets
+
+Store sensitive connection strings in .NET user-secrets:
 
 ```bash
-dotnet user-secrets set "MCPMSSQL_CONNECTION_STRING" "..." --project src/Alyio.McpMssql
+dotnet user-secrets set "MCPMSSQL_CONNECTION_STRING" "Server=localhost,1433;..." --project src/Alyio.McpMssql
 npx -y @modelcontextprotocol/inspector -e DOTNET_ENVIRONMENT=Development dotnet run --project src/Alyio.McpMssql
 ```
 
-**Azure SQL / Microsoft Entra ID:** This MCP server uses [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient), which supports Microsoft Entra (Azure AD) authentication. Set the `Authentication` property in the connection string to a supported mode (e.g. `Active Directory Default`, `Active Directory Managed Identity`, or `Active Directory Interactive`) when connecting to Azure SQL. See [Connect to Azure SQL with Microsoft Entra authentication and SqlClient](https://learn.microsoft.com/en-us/sql/connect/ado-net/sql/azure-active-directory-authentication) for all modes and details.
+### Azure SQL / Microsoft Entra ID
 
-## Tools and resources
+This server uses [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient), which supports Microsoft Entra (Azure AD) authentication. Provide connection strings using Entra credentials or managed identities as documented by SqlClient.
 
-All tools accept an optional `profile`; when omitted, the default profile is used.
+## Tools and Resources
 
-**Tools**
+All tools accept an optional `profile` parameter; when omitted, the default profile is used.
 
-| Tool | Description | Key params |
+### Available Tools
+
+| Tool | Description | Key Parameters |
 |---|---|---|
-| **`list_profiles`** | List configured connection profiles. Call first when picking a non-default profile. | — |
-| **`get_object`** | Get metadata for one relation (columns, indexes, constraints, relationships) or routine (definition). `name` accepts `Users`, `dbo.Users` or `[dbo].[Users]`. `includes` omitted → `columns`. Relations also carry an approximate `row_count`. | `kind`, `name`, `profile`, `catalog`, `schema`, `includes` |
-| **`run_query`** | Execute read-only T-SQL SELECT; only SELECT allowed (no DML/DDL). Returns results as CSV in the `data` field (inline) or a snapshot resource URI when `snapshot=true`. Inline limit: 500 rows (hard ceiling 1000). Snapshot limit: 10 000 rows (hard ceiling 50 000). Prefer `analyze_query` for plan tuning. | `sql`, `profile`, `catalog`, `parameters`, `snapshot` |
-| **`analyze_query`** | Analyze execution plan for a read-only SELECT. Returns compact JSON summary (cost, operators, cardinality, warnings, `missing_indexes`, waits, stats); no result rows, full XML at `plan_uri`. | `sql`, `profile`, `catalog`, `parameters`, `estimated` |
-| **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless the target `profile` sets `AllowWrite=true` (off by default). Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
+| **`list_profiles`** | List all configured connection profiles. | — |
+| **`get_object`** | Retrieve metadata for a table/view (columns, indexes, constraints, relationships) or routine definition. Accepts names like `Users`, `dbo.Users`, or `[dbo].[Users]`. | `name`, `kind` (relation/routine), `includes` (columns, indexes, constraints, relationships, definition) |
+| **`run_query`** | Execute a read-only SELECT query with parameterized binding. Returns results as CSV inline (up to limit) or as a snapshot resource URI. | `sql`, `params`, `snapshot`, `profile` |
+| **`analyze_query`** | Analyze a SELECT query's execution plan without fetching results. Returns compact JSON with cost, operators, cardinality, warnings, missing indexes, waits, and stats. Full XML plan available via resource URI. | `sql`, `params`, `profile` |
+| **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless `AllowWrite=true` for the target profile. Caller manages transactions. | `sql`, `params`, `profile` |
 
-- **`kind`** — `relation` or `routine`.
-- **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints`, `relationships` (relations only), `definition` (routines only). `relationships` returns foreign keys in both directions.
+### Available Resources
 
-Catalog browsing is left to `run_query` over `sys.objects`, `sys.schemas` and `sys.databases`. `get_object` accepts `analyze_query`'s `missing_indexes[].table` as-is.
-
-**Resources**
-
-| URI template | Description |
+| URI Template | Description |
 |---|---|
-| `mssql://profiles` | List configured connection profiles. Same data as `list_profiles`. |
-| `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`; entries expire after 7 days. |
-| `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 1 day. |
+| `mssql://profiles` | List configured connection profiles (same as `list_profiles` tool). |
+| `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`. Plans expire after 7 days. |
+| `mssql://snapshots/{id}` | Retrieve full query results as CSV by ID from `run_query` with `snapshot=true`. Results expire after 1 day. |
 
 ## Security
 
-The query tools (`run_query`, `analyze_query`) are read-only (`SELECT` only) and use parameterized `@paramName` binding. Use environment variables, config file or user-secrets for connection strings—never commit secrets.
+### Read-Only Query Enforcement
 
-**What counts as read-only.** The SQL is parsed with ScriptDom and must be exactly one `SELECT` statement in a single batch — not merely text that begins with `SELECT`. Multi-statement and `GO`-separated scripts are rejected, and so are these, despite being syntactically `SELECT`s:
+Query tools (`run_query`, `analyze_query`) enforce strict SELECT-only semantics using SQL ScriptDom parsing. The SQL must be exactly one `SELECT` statement in a single batch — not merely text starting with `SELECT`. Multi-statement batches and `GO` separators are rejected.
 
-| Rejected | Reason |
+**Rejected patterns:**
+
+| Pattern | Reason |
 |---|---|
-| `SELECT ... INTO` | Materializes a new table. |
-| `SELECT @v = ...` | Assigns a variable, mutating session state. |
-| `NEXT VALUE FOR` | Advances a sequence. |
-| `OPENQUERY`, `OPENDATASOURCE`, `OPENROWSET`, `OPENROWSET(BULK ...)` | Reads through an ad-hoc external data source. |
-| `UPDLOCK`, `XLOCK`, `TABLOCK`, `TABLOCKX`, `HOLDLOCK`, `SERIALIZABLE`, `REPEATABLEREAD` | Take locks that impede concurrent writers. |
+| `SELECT ... INTO` | Creates a new table (DDL). |
+| `SELECT @v = ...` | Mutates session state via variable assignment. |
+| `NEXT VALUE FOR` | Advances sequences. |
+| `OPENQUERY`, `OPENDATASOURCE`, `OPENROWSET(BULK ...)` | Ad-hoc external data source access. |
+| `UPDLOCK`, `XLOCK`, `TABLOCK`, `TABLOCKX`, `HOLDLOCK`, `SERIALIZABLE`, `REPEATABLEREAD` | Acquire locks that impede concurrent writers. |
 
-Hints that acquire no extra locks, such as `NOLOCK`, `ROWLOCK` and `READPAST`, stay allowed. Input longer than 64 KB or nested more than 100 parentheses deep is also refused, which keeps the recursive-descent parser clear of a stack overflow.
+**Allowed hints:** Concurrency-safe hints like `NOLOCK`, `ROWLOCK`, and `READPAST` are permitted.
 
-Like `AllowWrite` below, this constrains what this server will send — it is not a database permission.
+**Input limits:** SQL longer than 64 KB or nested more than 100 parentheses deep is rejected.
 
-**Writes are opt-in.** The `run_command` tool executes arbitrary T-SQL. It is rejected unless the target profile sets `AllowWrite=true`, which defaults to `false`, so existing deployments stay read-only with no change. The tool is always advertised and rejects at call time on locked profiles.
+### Parameterized Queries
 
-`AllowWrite` is a soft, application-level guard, **not** a security boundary — it constrains this server, not the database. For a genuine read-only guarantee, connect with a login restricted to `db_datareader`, and keep write-enabled profiles pointed at credentials scoped to only what they need. `run_command` is marked `destructive` via MCP tool annotations so hosts can gate it behind confirmation, but honor those annotations at the host's discretion.
+All query parameters use named `@paramName` binding to prevent SQL injection. Provide connection strings and credentials via environment variables, configuration files, or .NET user-secrets — never hardcode them.
 
-## MCP host examples
+### Write Operations (Opt-In)
 
-Snippets for common MCP clients. Replace the connection string with your own; ensure `dotnet` is on your PATH. The `env` block is not required if the connection string is already set via `appsettings.json` or environment variables.
+The `run_command` tool is rejected by default. Enable it only by setting `AllowWrite: true` in a profile's configuration.
+
+**Important:** `AllowWrite` is a soft, application-level guard, **not a security boundary**. It constrains this server's behavior, not database permissions. For a genuine read-only guarantee, connect with a database login restricted to `db_datareader` role.
+
+## MCP Host Configuration Examples
+
+Snippets for popular MCP clients. Replace the connection string with your own and ensure `dotnet` is on your `PATH`. The `env` block is optional if the connection string is already configured via `appsettings.json`.
 
 ### Cursor
 
@@ -272,10 +285,11 @@ MCPMSSQL_CONNECTION_STRING = "Server=127.0.0.1;User ID=sa;Password=<YourStrong@P
 }
 ```
 
+## Testing
 
-## Integration tests
+### Integration Tests
 
-Tests use a real SQL Server and the `default` profile (`MCPMSSQL_CONNECTION_STRING` from environment variables or user-secrets). The suite expects a database named **`McpMssqlTest`**: the connection string must include `Initial Catalog=McpMssqlTest`. The test infrastructure creates, seeds, and drops this database. Set the secret for the test project:
+Integration tests use a real SQL Server instance and expect a database named **`McpMssqlTest`**. Configure the test connection string via .NET user-secrets:
 
 ```bash
 dotnet user-secrets set "MCPMSSQL_CONNECTION_STRING" \
@@ -283,34 +297,44 @@ dotnet user-secrets set "MCPMSSQL_CONNECTION_STRING" \
   --project test/Alyio.McpMssql.Tests
 ```
 
-**One framework at a time.** The single `McpMssqlTest` database is shared by every test, and the fixtures drop and recreate it on initialization. Within one test process this is safe — the `SqlServer` collection disables parallelization. Across processes it is not: the test project targets both `net8.0` and `net10.0`, and `dotnet test` runs the two framework modules in parallel, so they race on that one database. There is no cross-process locking, so run a single framework at a time:
+Run tests for a single framework:
 
 ```bash
 dotnet test --framework net8.0
 dotnet test --framework net10.0
 ```
 
-CI does the same, iterating over `TARGET_FRAMEWORKS` sequentially.
+**Note:** The test fixtures drop and recreate the shared `McpMssqlTest` database on each initialization. This is safe within a single test process but requires sequential framework execution in CI.
 
-## Why this instead of Data API Builder?
+## Comparison: This vs. Data API Builder
 
-Data API Builder (DAB) is a full REST/GraphQL API with CRUD and auth. This project is a small, read-only MCP server for agents: stdio, parameterized SELECT only, minimal surface. Choose this for agent workflows and low operational overhead; choose DAB for CRUD, REST/GraphQL, and rich policies.
+| Aspect | MCP SQL Server | Data API Builder |
+|---|---|---|
+| **Purpose** | Lightweight MCP server for AI agents | Full REST/GraphQL CRUD API |
+| **Transport** | Standard input/output (stdio) | HTTP/REST or GraphQL |
+| **Query Support** | Parameterized SELECT only | CRUD, relationships, subscriptions |
+| **Authentication** | Database login via connection string | API-level auth (Azure AD, JWT, etc.) |
+| **Use Case** | Agent-driven schema discovery and analytics | Public/internal APIs, data applications |
+
+Choose this project for agent-based SQL analysis with minimal surface area; choose Data API Builder for production APIs.
 
 ## Roadmap
 
-**MCP Tasks extension ([SEP-2663](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2663)).** Snapshot queries and execution-plan analysis run under long timeouts (120 s and 300 s by default), which is the shape the [Tasks extension](https://modelcontextprotocol.io/extensions/tasks/overview) exists for: the server returns a durable task handle instead of blocking, and the client polls `tasks/get` until the work reaches a terminal state.
+### MCP Tasks Extension
 
-The fit is good; adoption is the blocker. Tasks is an opt-in extension (`io.modelcontextprotocol/tasks`) that a server may only use when the client declares support in its per-request capabilities, and no client currently lists it in the [extension support matrix](https://modelcontextprotocol.io/extensions/client-matrix). Deferred until clients ship support.
+Support for [MCP Tasks extension (SEP-2663)](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2663) is planned. Snapshot queries and execution-plan analysis currently run under long timeouts (120 s and 300 s, respectively) but would benefit from Tasks' structured long-running operation model.
 
-## Schema compatibility
+Tasks is an opt-in extension (`io.modelcontextprotocol/tasks`) that a server uses only when the client declares support in its per-request capabilities. Adoption remains the key blocker.
 
-Nullable members emit a JSON Schema union type — `"type": ["string", "null"]` — because that is what `System.Text.Json` produces for `string?` and friends. It is legal JSON Schema 2020-12 and permitted by the MCP spec. MCP Inspector warns on the form, on the grounds that some MCP clients read `type` as a single string; whether that rule still has evidence behind it is [under review upstream](https://github.com/modelcontextprotocol/inspector/issues/2286). Rewriting to `anyOf` is not a clear win: OpenAI documents the union form for optional parameters, Anthropic supports `anyOf` and not type arrays, and Cursor, Gemini, and Azure AI Foundry reject `anyOf`.
+## JSON Schema Compatibility
 
-Nothing is lost by ignoring the null branch. This server never serializes null — absent members are omitted rather than sent as `null` — and no nullable member appears in a `required` list, so a client that reads only the first type in the union gets the exact contract. Left as the SDK emits it; revisit if the SDK changes or the rule settles.
+Nullable members emit JSON Schema union types — `"type": ["string", "null"]` — matching `System.Text.Json`'s behavior for `string?` and similar nullable types. This is valid in JSON Schema 2020-12.
+
+**Note:** This server never serializes `null` values; absent members are omitted from responses. No nullable member appears in a `required` list, so clients can safely ignore the null branch when needed.
 
 ## Contributing
 
-Open issues or PRs; follow existing style and add tests where appropriate.
+We welcome issues and pull requests. Please follow the existing code style and add tests for new features.
 
 ## License
 
