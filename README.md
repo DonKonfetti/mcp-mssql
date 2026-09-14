@@ -19,20 +19,20 @@ Set `MCPMSSQL_CONNECTION_STRING` and run the server in one of these ways:
 ```bash
 # Option 1: Run from NuGet package (e.g. with MCP Inspector)
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
-npx -y @modelcontextprotocol/inspector dotnet dnx Alyio.McpMssql --prerelease
+npx -y @modelcontextprotocol/inspector@latest dotnet dnx Alyio.McpMssql --prerelease
 ```
 
 ```bash
 # Option 2: Install and run as a global tool
 dotnet tool install --global Alyio.McpMssql --prerelease
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
-npx -y @modelcontextprotocol/inspector mcp-mssql
+npx -y @modelcontextprotocol/inspector@latest mcp-mssql
 ```
 
 ```bash
 # Option 3: Run from source (clone repo, then)
 export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
-npx -y @modelcontextprotocol/inspector dotnet run --project src/Alyio.McpMssql
+npx -y @modelcontextprotocol/inspector@latest dotnet run --project src/Alyio.McpMssql -f net10.0
 ```
 
 Use `--prerelease` for pre-release builds.
@@ -139,13 +139,9 @@ All tools accept an optional `profile`; when omitted, the default profile is use
 | **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless the target `profile` sets `AllowWrite=true` (off by default). Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
 
 - **`kind`** — `relation` or `routine`.
-- **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints`, `relationships` (relations only), `definition` (routines only). `relationships` returns foreign keys in both directions — those the table declares and those declared against it.
+- **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints`, `relationships` (relations only), `definition` (routines only). `relationships` returns foreign keys in both directions.
 
-There is no tool for browsing the catalog: use `run_query` over `sys.objects`,
-`sys.schemas` and `sys.databases`, which filters and projects far better than a
-fixed listing could. `get_object` takes `analyze_query`'s
-`missing_indexes[].table` verbatim, so an index suggestion can be checked
-against the indexes that already exist.
+Catalog browsing is left to `run_query` over `sys.objects`, `sys.schemas` and `sys.databases`. `get_object` accepts `analyze_query`'s `missing_indexes[].table` as-is.
 
 **Resources**
 
@@ -156,11 +152,9 @@ against the indexes that already exist.
 | `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`; entries expire after 7 days. |
 | `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 1 day. |
 
-Resources mirror their corresponding tools and return JSON (except `mssql://plans/{id}` which returns XML and `mssql://snapshots/{id}` which returns CSV).
-
 ## Security
 
-The query tools (`run_query`, `analyze_query`) are read-only (`SELECT` only) and use parameterized `@paramName` binding. Use environment variables or user-secrets for connection strings—never commit secrets.
+The query tools (`run_query`, `analyze_query`) are read-only (`SELECT` only) and use parameterized `@paramName` binding. Use environment variables, config file or user-secrets for connection strings—never commit secrets.
 
 **What counts as read-only.** The SQL is parsed with ScriptDom and must be exactly one `SELECT` statement in a single batch — not merely text that begins with `SELECT`. Multi-statement and `GO`-separated scripts are rejected, and so are these, despite being syntactically `SELECT`s:
 
