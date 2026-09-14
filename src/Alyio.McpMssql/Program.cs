@@ -21,20 +21,21 @@ builder.Logging.AddConsole(consoleLogOptions =>
 });
 
 builder.Configuration.Sources.Clear();
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-    .AddJsonFile(
-        $"appsettings.{builder.Environment.EnvironmentName}.json",
-        optional: true,
-        reloadOnChange: false)
-    .AddJsonFile(userConfigPath, optional: true, reloadOnChange: false);
+
+builder.Configuration.AddJsonFile(userConfigPath, optional: true, reloadOnChange: false);
 
 if (builder.Environment.IsDevelopment())
 {
-    builder.Configuration.AddUserSecrets(
-        System.Reflection.Assembly.GetExecutingAssembly(),
-        optional: true,
-        reloadOnChange: false);
+    builder.Configuration
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+        .AddJsonFile(
+            $"appsettings.{builder.Environment.EnvironmentName}.json",
+            optional: true,
+            reloadOnChange: false)
+        .AddUserSecrets(
+            System.Reflection.Assembly.GetExecutingAssembly(),
+            optional: true,
+            reloadOnChange: false);
 }
 
 builder.Configuration
