@@ -67,6 +67,43 @@ public class SqlReadOnlyValidatorTests
     }
 
     [Fact]
+    public void Validate_Throws_For_Oversized_Query()
+    {
+        var sql = $"select * from Users where Name = '{new string('x', 64 * 1024)}'";
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlReadOnlyValidator.Validate(sql));
+    }
+
+    [Fact]
+    public void Validate_Throws_For_Deeply_Nested_Query()
+    {
+        // Far below the depth that overflows the stack, so the guard is what
+        // rejects this rather than the process dying.
+        var sql = $"select {new string('(', 200)}1{new string(')', 200)}";
+
+        Assert.Throws<InvalidOperationException>(() =>
+            SqlReadOnlyValidator.Validate(sql));
+    }
+
+    [Fact]
+    public void Validate_Allows_Moderately_Nested_Query()
+    {
+        var sql = $"select {new string('(', 50)}1{new string(')', 50)}";
+
+        SqlReadOnlyValidator.Validate(sql);
+    }
+
+    [Fact]
+    public void Validate_Ignores_Parentheses_Inside_Literals()
+    {
+        // Depth is counted over tokens, so these never open a nesting level.
+        var sql = $"select '{new string('(', 500)}' as Value";
+
+        SqlReadOnlyValidator.Validate(sql);
+    }
+
+    [Fact]
     public void Validate_Throws_For_Multiple_Statements()
     {
         var sql = "select * from Users; select * from Orders";
