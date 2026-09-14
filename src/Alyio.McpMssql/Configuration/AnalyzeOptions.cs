@@ -14,6 +14,12 @@ public sealed class AnalyzeOptions
     /// Maximum execution time for an analysis command, in seconds.
     /// Defaults to 300 (5 minutes) to accommodate complex queries
     /// that need to run to completion for accurate runtime statistics.
+    /// Clamped to <see cref="HardCommandTimeoutSeconds"/>.
     /// </summary>
     public int CommandTimeoutSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// Absolute, non-configurable hard limit for analysis execution time.
+    /// </summary>
+    internal const int HardCommandTimeoutSeconds = 600;
 }

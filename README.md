@@ -62,7 +62,7 @@ export MCPMSSQL_QUERY_SNAPSHOT_MAX_ROWS="10000"
 # Optional snapshot query timeout in seconds (default `120`).
 export MCPMSSQL_QUERY_SNAPSHOT_COMMAND_TIMEOUT_SECONDS="120"
 
-# Optional analyze timeout in seconds (default `300`).
+# Optional analyze timeout in seconds (default `300`; hard ceiling `600`).
 export MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS="300"
 
 # Optional: enable write commands (DDL/DML) via run_command (default `false`).
