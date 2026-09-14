@@ -208,7 +208,7 @@ internal sealed class CatalogService(IProfileService profileService) : ICatalogS
             result = await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (SqlException ex) when (ex.Number is 229 or 297 or 300)
+        catch (SqlException ex) when (IsRowCountPermissionDenied(ex))
         {
             // No VIEW DATABASE STATE. The row count is supplementary, so degrade
             // to null rather than failing the whole describe.
@@ -227,5 +227,15 @@ internal sealed class CatalogService(IProfileService profileService) : ICatalogS
             decimal d => (long)d,
             _ => null,
         };
+    }
+
+    private static bool IsRowCountPermissionDenied(SqlException exception)
+        => ContainsRowCountPermissionError(
+            exception.Errors.Cast<SqlError>().Select(static error => error.Number));
+
+    internal static bool ContainsRowCountPermissionError(IEnumerable<int> errorNumbers)
+    {
+        ArgumentNullException.ThrowIfNull(errorNumbers);
+        return errorNumbers.Any(static number => number is 229 or 262 or 297 or 300);
     }
 }
