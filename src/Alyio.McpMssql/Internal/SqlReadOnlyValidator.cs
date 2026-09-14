@@ -89,18 +89,19 @@ internal static class SqlReadOnlyValidator
 
         EnsureNestingWithinLimit(parser, sql);
 
-        TSqlFragment fragment;
+        using var reader = new StringReader(sql);
 
-        using (var reader = new StringReader(sql))
+        TSqlFragment fragment = parser.Parse(reader, out IList<ParseError> errors);
+
+        if (errors.Count > 0)
         {
-            fragment = parser.Parse(reader, out IList<ParseError> errors);
-
-            if (errors.Count > 0)
-            {
-                ParseError first = errors[0];
-                throw new InvalidOperationException(
-                    $"Invalid T-SQL at line {first.Line}, column {first.Column}: {first.Message}");
-            }
+            // ScriptDom stops at the first error within a statement, so a
+            // single-statement query reports exactly one. Several errors mean
+            // several batches, which the single-SELECT check below rejects
+            // regardless of their syntax.
+            ParseError first = errors[0];
+            throw new InvalidOperationException(
+                $"Invalid T-SQL at line {first.Line}, column {first.Column}: {first.Message}");
         }
 
         if (fragment is not TSqlScript { Batches.Count: 1 } script
