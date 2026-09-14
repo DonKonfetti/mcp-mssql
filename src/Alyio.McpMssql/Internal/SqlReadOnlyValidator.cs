@@ -12,6 +12,36 @@ internal static class SqlReadOnlyValidator
     /// <summary>
     /// Parses and validates the provided T-SQL text.
     /// </summary>
+    /// <remarks>
+    /// The text must parse as a single batch holding exactly one
+    /// <c>SELECT</c> statement. Everything else is rejected, including DDL,
+    /// DML, <c>EXEC</c>, and multi-statement or <c>GO</c>-separated scripts.
+    /// Within that statement the following are rejected as well:
+    /// <list type="bullet">
+    ///   <item><description>
+    ///     <c>SELECT ... INTO</c>, which materializes a new table.
+    ///   </description></item>
+    ///   <item><description>
+    ///     Variable assignment (<c>SELECT @v = ...</c>), which mutates
+    ///     session state.
+    ///   </description></item>
+    ///   <item><description>
+    ///     <c>NEXT VALUE FOR</c>, which advances a sequence.
+    ///   </description></item>
+    ///   <item><description>
+    ///     Ad-hoc external data sources: <c>OPENQUERY</c>,
+    ///     <c>OPENDATASOURCE</c>, <c>OPENROWSET</c>, and
+    ///     <c>OPENROWSET(BULK)</c>.
+    ///   </description></item>
+    ///   <item><description>
+    ///     Locking hints that impede writers: <c>HOLDLOCK</c> and its synonym
+    ///     <c>SERIALIZABLE</c>, <c>REPEATABLEREAD</c>, <c>TABLOCK</c>,
+    ///     <c>TABLOCKX</c>, <c>UPDLOCK</c>, and <c>XLOCK</c>.
+    ///   </description></item>
+    /// </list>
+    /// Hints that take no additional locks, such as <c>NOLOCK</c>,
+    /// <c>ROWLOCK</c> and <c>READPAST</c>, stay allowed.
+    /// </remarks>
     /// <exception cref="ArgumentException">
     /// Thrown when the SQL is null or empty.
     /// </exception>
@@ -103,6 +133,9 @@ internal static class SqlReadOnlyValidator
         public override void ExplicitVisit(TableHint node)
         {
             if (node.HintKind is TableHintKind.HoldLock
+                or TableHintKind.RepeatableRead
+                or TableHintKind.Serializable
+                or TableHintKind.TabLock
                 or TableHintKind.TabLockX
                 or TableHintKind.UpdLock
                 or TableHintKind.XLock)

@@ -17,6 +17,8 @@ public class SqlReadOnlyValidatorTests
     [InlineData("select \"delete\" from \"table\"")]
     [InlineData("select '--' as Value")]
     [InlineData("select '/* not a comment */' as Value")]
+    [InlineData("select * from Users with (nolock)")]
+    [InlineData("select * from Users with (rowlock, readpast)")]
     public void Validate_Allows_ReadOnly_Select_Queries(string sql)
     {
         // Act / Assert
@@ -52,6 +54,12 @@ public class SqlReadOnlyValidatorTests
     [InlineData("select * from Users with (xlock)")]
     [InlineData("select * from Users with (tablockx)")]
     [InlineData("select * from Users with (holdlock)")]
+    [InlineData("select * from Users with (serializable)")]
+    [InlineData("select * from Users with (repeatableread)")]
+    [InlineData("select * from Users with (tablock)")]
+    [InlineData("select * from Users with (serializable, rowlock)")]
+    [InlineData("select * from Users u join Orders o with (serializable) on o.UserId = u.Id")]
+    [InlineData("with cte as (select * from Users with (serializable)) select * from cte")]
     public void Validate_Throws_For_Forbidden_Keywords(string sql)
     {
         Assert.Throws<InvalidOperationException>(() =>
