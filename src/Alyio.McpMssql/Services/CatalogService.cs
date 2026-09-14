@@ -8,96 +8,6 @@ namespace Alyio.McpMssql.Services;
 
 internal sealed class CatalogService(IProfileService profileService) : ICatalogService
 {
-    public async Task<TabularResult> ListCatalogsAsync(
-        string? profile = null,
-        CancellationToken cancellationToken = default)
-    {
-        var resolved = profileService.Resolve(profile);
-        var sql = await Loader.ReadText("databases.sql", cancellationToken).ConfigureAwait(false);
-
-        using var conn = new SqlConnection(resolved.ConnectionString);
-        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        return await conn.ExecuteAsTabularResultAsync(sql, null, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    public async Task<TabularResult> ListSchemasAsync(
-        string? catalog = null,
-        string? profile = null,
-        CancellationToken cancellationToken = default)
-    {
-        var resolved = profileService.Resolve(profile);
-        var sql = await Loader.ReadText("schemas.sql", cancellationToken).ConfigureAwait(false);
-
-        using var conn = new SqlConnection(resolved.ConnectionString);
-        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        if (!string.IsNullOrWhiteSpace(catalog))
-        {
-            conn.ChangeDatabase(catalog);
-        }
-
-        var parameters = new[] { new SqlParameter("@is_ms_shipped", DBNull.Value) };
-        return await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    public async Task<TabularResult> ListRelationsAsync(
-        string? catalog = null,
-        string? schema = null,
-        string? profile = null,
-        CancellationToken cancellationToken = default)
-    {
-        var resolved = profileService.Resolve(profile);
-        var sql = await Loader.ReadText("relations.sql", cancellationToken).ConfigureAwait(false);
-
-        using var conn = new SqlConnection(resolved.ConnectionString);
-        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        if (!string.IsNullOrWhiteSpace(catalog))
-        {
-            conn.ChangeDatabase(catalog);
-        }
-
-        var parameters = new[]
-        {
-            new SqlParameter("@schema", schema ?? (object)DBNull.Value),
-            new SqlParameter("@is_ms_shipped", DBNull.Value)
-        };
-
-        return await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    public async Task<TabularResult> ListRoutinesAsync(
-        string? catalog = null,
-        string? schema = null,
-        string? profile = null,
-        bool? includeSystem = null,
-        CancellationToken cancellationToken = default)
-    {
-        var resolved = profileService.Resolve(profile);
-        var sql = await Loader.ReadText("routines.sql", cancellationToken).ConfigureAwait(false);
-
-        using var conn = new SqlConnection(resolved.ConnectionString);
-        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        if (!string.IsNullOrWhiteSpace(catalog))
-        {
-            conn.ChangeDatabase(catalog);
-        }
-
-        var parameters = new[]
-        {
-            new SqlParameter("@schema", schema ?? (object)DBNull.Value),
-            new SqlParameter("@is_ms_shipped", includeSystem == true ? (object)DBNull.Value : 0),
-        };
-
-        return await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
-            .ConfigureAwait(false);
-    }
-
     public async Task<TabularResult> DescribeColumnsAsync(
         string name,
         string? catalog = null,
@@ -240,5 +150,82 @@ internal sealed class CatalogService(IProfileService profileService) : ICatalogS
             Rows = [[definition]],
         };
     }
-}
+    public async Task<TabularResult> DescribeRelationshipsAsync(
+        string name,
+        string? catalog = null,
+        string? schema = null,
+        string? profile = null,
+        CancellationToken cancellationToken = default)
+    {
+        var resolved = profileService.Resolve(profile);
+        var sql = await Loader.ReadText("relationships.sql", cancellationToken).ConfigureAwait(false);
 
+        using var conn = new SqlConnection(resolved.ConnectionString);
+        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(catalog))
+        {
+            conn.ChangeDatabase(catalog);
+        }
+
+        var parameters = new[]
+        {
+            new SqlParameter("@table", name),
+            new SqlParameter("@schema", schema ?? (object)DBNull.Value)
+        };
+
+        return await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<long?> GetRowCountAsync(
+        string name,
+        string? catalog = null,
+        string? schema = null,
+        string? profile = null,
+        CancellationToken cancellationToken = default)
+    {
+        var resolved = profileService.Resolve(profile);
+        var sql = await Loader.ReadText("row_count.sql", cancellationToken).ConfigureAwait(false);
+
+        using var conn = new SqlConnection(resolved.ConnectionString);
+        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(catalog))
+        {
+            conn.ChangeDatabase(catalog);
+        }
+
+        var parameters = new[]
+        {
+            new SqlParameter("@table", name),
+            new SqlParameter("@schema", schema ?? (object)DBNull.Value)
+        };
+
+        TabularResult result;
+        try
+        {
+            result = await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (SqlException ex) when (ex.Number is 229 or 297 or 300)
+        {
+            // No VIEW DATABASE STATE. The row count is supplementary, so degrade
+            // to null rather than failing the whole describe.
+            return null;
+        }
+
+        if (result.Rows.Count == 0)
+        {
+            return null;
+        }
+
+        return result.Rows[0][0] switch
+        {
+            long l => l,
+            int i => i,
+            decimal d => (long)d,
+            _ => null,
+        };
+    }
+}

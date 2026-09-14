@@ -133,14 +133,19 @@ All tools accept an optional `profile`; when omitted, the default profile is use
 |---|---|---|
 | **`list_profiles`** | List configured connection profiles. Call first when picking a non-default profile. | — |
 | **`get_server_properties`** | Get server properties and execution limits (timeouts, row caps, guardrails). | `profile` |
-| **`list_objects`** | List catalog metadata. `kind=catalog`: databases; `schema`: schemas; `relation`: tables/views; `routine`: procedures/functions. `catalog` omitted → active catalog (ignored for `kind=catalog`). `schema` omission depends on kind. | `kind`, `profile`, `catalog`, `schema` |
-| **`get_object`** | Get metadata for one relation or routine. Use `list_objects` to resolve names. Returns empty detail payloads if `includes` is null. | `kind`, `name`, `profile`, `catalog`, `schema`, `includes` |
+| **`get_object`** | Get metadata for one relation (columns, indexes, constraints, relationships) or routine (definition). `name` accepts `Users`, `dbo.Users` or `[dbo].[Users]`. `includes` omitted → `columns`. Relations also carry an approximate `row_count`. | `kind`, `name`, `profile`, `catalog`, `schema`, `includes` |
 | **`run_query`** | Execute read-only T-SQL SELECT; only SELECT allowed (no DML/DDL). Returns results as CSV in the `data` field (inline) or a snapshot resource URI when `snapshot=true`. Inline limit: 500 rows (hard ceiling 1000). Snapshot limit: 10 000 rows. Prefer `analyze_query` for plan tuning. | `sql`, `profile`, `catalog`, `parameters`, `snapshot` |
-| **`analyze_query`** | Analyze execution plan for a read-only SELECT. Returns compact JSON summary (cost, operators, cardinality, warnings, indexes, waits, stats). Fetch full XML from `plan_uri`; does not return result rows. | `sql`, `profile`, `catalog`, `parameters`, `estimated` |
+| **`analyze_query`** | Analyze execution plan for a read-only SELECT. Returns compact JSON summary (cost, operators, cardinality, warnings, `missing_indexes`, waits, stats); no result rows, full XML at `plan_uri`. | `sql`, `profile`, `catalog`, `parameters`, `estimated` |
 | **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless the target `profile` sets `AllowWrite=true` (off by default). Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
 
-- **`kind`** — `catalog`, `schema`, `relation`, or `routine`. For `get_object`, only `relation` or `routine`.
-- **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints` (relations only), `definition` (routines only).
+- **`kind`** — `relation` or `routine`.
+- **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints`, `relationships` (relations only), `definition` (routines only). `relationships` returns foreign keys in both directions — those the table declares and those declared against it.
+
+There is no tool for browsing the catalog: use `run_query` over `sys.objects`,
+`sys.schemas` and `sys.databases`, which filters and projects far better than a
+fixed listing could. `get_object` takes `analyze_query`'s
+`missing_indexes[].table` verbatim, so an index suggestion can be checked
+against the indexes that already exist.
 
 **Resources**
 

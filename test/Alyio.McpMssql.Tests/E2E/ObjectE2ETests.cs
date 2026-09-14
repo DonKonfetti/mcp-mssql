@@ -10,89 +10,25 @@ public sealed class ObjectE2ETests(McpServerFixture fixture) : IClassFixture<Mcp
     private readonly McpClient _client = fixture.Client;
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    private const string ObjectsToolName = "list_objects";
     private const string ObjectToolName = "get_object";
     private static readonly string[] s_includeColumns = ["columns"];
     private static readonly string[] s_includeIndexes = ["indexes"];
     private static readonly string[] s_includeConstraints = ["constraints"];
     private static readonly string[] s_includeDefinition = ["definition"];
+    private static readonly string[] s_includeRelationships = ["relationships"];
 
     // ── Tool discovery ──
 
     [Fact]
     public async Task Object_Tools_Are_Discoverable()
     {
-        Assert.True(await _client.IsToolRegisteredAsync(ObjectsToolName, ObjectToolName));
-    }
-
-    // ── list_objects ──
-
-    [Fact]
-    public async Task ListCatalogs_Tool_Returns_Expected_Columns()
-    {
-        var result = await _client.CallToolAsync(
-            ObjectsToolName,
-            new Dictionary<string, object?> { ["kind"] = "catalog" },
-            cancellationToken: CancellationToken);
-
-        var root = result.ReadJsonRoot();
-        var (columns, _) = root.ReadColumnRows();
-
-        columns.AssertHasColumns("name", "state_desc", "is_read_only", "is_system_db");
+        Assert.True(await _client.IsToolRegisteredAsync(ObjectToolName));
     }
 
     [Fact]
-    public async Task ListSchemas_Tool_Returns_Expected_Columns()
+    public async Task ListObjects_Tool_Is_Not_Registered()
     {
-        var result = await _client.CallToolAsync(
-            ObjectsToolName,
-            new Dictionary<string, object?>
-            {
-                ["kind"] = "schema",
-                ["catalog"] = "master"
-            },
-            cancellationToken: CancellationToken);
-
-        var root = result.ReadJsonRoot();
-        var (columns, _) = root.ReadColumnRows();
-
-        columns.AssertHasColumns("name");
-    }
-
-    [Fact]
-    public async Task ListRelations_Tool_Returns_Expected_Columns()
-    {
-        var result = await _client.CallToolAsync(
-            ObjectsToolName,
-            new Dictionary<string, object?>
-            {
-                ["kind"] = "relation",
-                ["catalog"] = "master",
-                ["schema"] = "dbo"
-            },
-            cancellationToken: CancellationToken);
-        var root = result.ReadJsonRoot();
-        var (columns, _) = root.ReadColumnRows();
-        columns.AssertHasColumns("name", "type");
-    }
-
-    [Fact]
-    public async Task ListRoutines_Tool_Returns_Expected_Columns()
-    {
-        var result = await _client.CallToolAsync(
-            ObjectsToolName,
-            new Dictionary<string, object?>
-            {
-                ["kind"] = "routine",
-                ["catalog"] = "master",
-                ["schema"] = "dbo"
-            },
-            cancellationToken: CancellationToken);
-
-        var root = result.ReadJsonRoot();
-        var (columns, _) = root.ReadColumnRows();
-
-        columns.AssertHasColumns("name", "type");
+        Assert.False(await _client.IsToolRegisteredAsync("list_objects"));
     }
 
     // ── get_object ──
@@ -187,5 +123,47 @@ public sealed class ObjectE2ETests(McpServerFixture fixture) : IClassFixture<Mcp
         var (columns, _) = root.ReadColumnRowsFrom("definition");
 
         columns.AssertHasColumns("definition");
+    }
+    [Fact]
+    public async Task DescribeRelationships_Tool_Returns_Expected_Columns()
+    {
+        var result = await _client.CallToolAsync(
+            ObjectToolName,
+            new Dictionary<string, object?>
+            {
+                ["kind"] = "relation",
+                ["catalog"] = "master",
+                ["schema"] = "sys",
+                ["name"] = "objects",
+                ["includes"] = s_includeRelationships
+            },
+            cancellationToken: CancellationToken);
+
+        var root = result.ReadJsonRoot();
+        var (columns, _) = root.ReadColumnRowsFrom("relationships");
+
+        columns.AssertHasColumns(
+            "direction", "fk_name", "parent_schema", "parent_table", "parent_column",
+            "referenced_schema", "referenced_table", "referenced_column",
+            "delete_action", "update_action");
+    }
+
+    [Fact]
+    public async Task GetObject_Without_Includes_Returns_Columns()
+    {
+        var result = await _client.CallToolAsync(
+            ObjectToolName,
+            new Dictionary<string, object?>
+            {
+                ["kind"] = "relation",
+                ["catalog"] = "master",
+                ["name"] = "[sys].[objects]"
+            },
+            cancellationToken: CancellationToken);
+
+        var root = result.ReadJsonRoot();
+        var (columns, _) = root.ReadColumnRowsFrom("columns");
+
+        columns.AssertHasColumns("name", "type", "is_nullable", "column_id");
     }
 }

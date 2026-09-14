@@ -1,10 +1,12 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
 /// Response shape for get_object (single object detail).
-/// Identity plus optional detail parts (columns, indexes, constraints, definition) per include request.
+/// Identity plus optional detail parts (columns, indexes, constraints, relationships, definition) per include request.
 /// </summary>
 public sealed class ObjectResult
 {
@@ -17,6 +19,16 @@ public sealed class ObjectResult
     /// <summary>Table constraints (PK, UQ, FK, CHECK, DEFAULT). Present when include requested constraints; relation only.</summary>
     public TableConstraints? Constraints { get; init; }
 
+    /// <summary>Foreign keys in both directions. Present when include requested relationships; relation only.</summary>
+    public TabularResult? Relationships { get; init; }
+
     /// <summary>T-SQL routine body. Present when include requested definition; routine only.</summary>
     public TabularResult? Definition { get; init; }
+
+    /// <summary>
+    /// Approximate row count for a relation; null for routines, views, and
+    /// when the caller lacks VIEW DATABASE STATE.
+    /// </summary>
+    [Description("Approximate row count from partition stats, not COUNT(*). Null for routines and views.")]
+    public long? RowCount { get; init; }
 }

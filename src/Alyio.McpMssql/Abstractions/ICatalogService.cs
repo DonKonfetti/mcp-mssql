@@ -9,99 +9,11 @@ namespace Alyio.McpMssql;
 /// <summary>
 /// Provides read-only access to SQL Server catalog metadata.
 ///
-/// Supports discovery of catalogs (databases), schemas, tabular relations
-/// (tables and views), and routines (procedures and functions).
+/// Describes a single tabular relation (table or view) or routine
+/// (procedure or function); discovery of names is left to queries.
 /// </summary>
 public interface ICatalogService
 {
-    /// <summary>
-    /// Lists catalogs accessible to the current connection.
-    /// </summary>
-    /// <param name="profile">
-    /// Optional profile name. If null or empty, the default profile is used.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Token used to cancel the operation.
-    /// </param>
-    /// <returns>
-    /// A read-only list of catalog (database) names.
-    /// </returns>
-    Task<TabularResult> ListCatalogsAsync(
-        string? profile = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lists schemas within a catalog.
-    /// </summary>
-    /// <param name="catalog">
-    /// Optional catalog (database) name. If omitted, uses the active catalog.
-    /// </param>
-    /// <param name="profile">
-    /// Optional profile name. If null or empty, the default profile is used.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Token used to cancel the operation.
-    /// </param>
-    /// <returns>
-    /// A read-only list of schema names within the specified catalog.
-    /// </returns>
-    Task<TabularResult> ListSchemasAsync(
-        string? catalog = null,
-        string? profile = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lists tabular relations (tables and views) within a catalog.
-    /// </summary>
-    /// <param name="catalog">
-    /// Optional catalog (database) name. If omitted, uses the active catalog.
-    /// </param>
-    /// <param name="schema">
-    /// Optional schema name. If omitted, lists relations from all schemas.
-    /// </param>
-    /// <param name="profile">
-    /// Optional profile name. If null or empty, the default profile is used.
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Token used to cancel the operation.
-    /// </param>
-    /// <returns>
-    /// A read-only list of relation names accessible within the specified scope.
-    /// </returns>
-    Task<TabularResult> ListRelationsAsync(
-        string? catalog = null,
-        string? schema = null,
-        string? profile = null,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lists routines (procedures and functions) within a catalog.
-    /// </summary>
-    /// <param name="catalog">
-    /// Optional catalog (database) name. If omitted, uses the active catalog.
-    /// </param>
-    /// <param name="schema">
-    /// Optional schema name. If omitted, uses the default schema of the caller.
-    /// </param>
-    /// <param name="profile">
-    /// Optional profile name. If null or empty, the default profile is used.
-    /// </param>
-    /// <param name="includeSystem">
-    /// Optional. When true, include system routines; when false or null, exclude them (default).
-    /// </param>
-    /// <param name="cancellationToken">
-    /// Token used to cancel the operation.
-    /// </param>
-    /// <returns>
-    /// A read-only list of routine names accessible within the specified scope.
-    /// </returns>
-    Task<TabularResult> ListRoutinesAsync(
-        string? catalog = null,
-        string? schema = null,
-        string? profile = null,
-        bool? includeSystem = null,
-        CancellationToken cancellationToken = default);
-
     /// <summary>
     /// Describes the column-level structure of a tabular relation.
     /// </summary>
@@ -183,5 +95,38 @@ public interface ICatalogService
         string? schema = null,
         string? profile = null,
         CancellationToken cancellationToken = default);
-}
+    /// <summary>
+    /// Describes the foreign keys of a table in both directions: those it
+    /// declares (outgoing) and those declared against it (incoming).
+    /// </summary>
+    /// <param name="name">Name of the table.</param>
+    /// <param name="catalog">Optional catalog (database) name. If omitted, uses the active catalog.</param>
+    /// <param name="schema">Optional schema name. If omitted, uses default schema resolution.</param>
+    /// <param name="profile">Optional profile name. If null or empty, the default profile is used.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>One row per foreign key column, with a direction discriminator.</returns>
+    Task<TabularResult> DescribeRelationshipsAsync(
+        string name,
+        string? catalog = null,
+        string? schema = null,
+        string? profile = null,
+        CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Gets the approximate row count of a table from partition statistics.
+    /// Returns null for views, for objects that do not exist, and when the
+    /// caller lacks VIEW DATABASE STATE.
+    /// </summary>
+    /// <param name="name">Name of the table.</param>
+    /// <param name="catalog">Optional catalog (database) name. If omitted, uses the active catalog.</param>
+    /// <param name="schema">Optional schema name. If omitted, uses default schema resolution.</param>
+    /// <param name="profile">Optional profile name. If null or empty, the default profile is used.</param>
+    /// <param name="cancellationToken">Token used to cancel the operation.</param>
+    /// <returns>The approximate row count, or null when unavailable.</returns>
+    Task<long?> GetRowCountAsync(
+        string name,
+        string? catalog = null,
+        string? schema = null,
+        string? profile = null,
+        CancellationToken cancellationToken = default);
+}

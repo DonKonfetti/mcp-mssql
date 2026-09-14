@@ -30,7 +30,7 @@ public static class QueryTools
         string sql,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
-        [Description("If omitted, uses the active catalog on the connection. Src: catalogs.")]
+        [Description("If omitted, uses the active catalog on the connection. Src: run_query (sys.databases).")]
         string? catalog = null,
         [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
@@ -52,17 +52,17 @@ public static class QueryTools
     [McpServerTool(UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
     [Description(
         "[MSSQL] Analyze execution plan for a read-only SELECT. " +
-        "Returns a compact JSON summary (cost, operators, cardinality, warnings, indexes, waits, stats). " +
-        "Fetch full XML from plan_uri; does not return raw result rows.")]
+        "Returns a compact JSON summary (cost, operators, cardinality, warnings, missing_indexes, waits, stats); " +
+        "no result rows, full XML at plan_uri.")]
     public static Task<AnalyzeResult> AnalyzeQueryAsync(
         IQueryService queryService,
         [Description("Read-only T-SQL SELECT to analyze; only SELECT is allowed.")]
         string sql,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
-        [Description("If omitted, uses the active catalog on the connection. Src: catalogs.")]
+        [Description("If omitted, uses the active catalog on the connection. Src: run_query (sys.databases).")]
         string? catalog = null,
-        [Description("Values for SQL parameters; keys are names without '@'.")]
+        [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
         [Description("When true, returns estimated plan without executing. Default false: actual plan with runtime stats.")]
         bool estimated = false,

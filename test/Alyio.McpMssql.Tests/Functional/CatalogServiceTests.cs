@@ -12,128 +12,9 @@ public sealed class CatalogServiceTests(SqlServerFixture fixture) : SqlServerFun
     private readonly ICatalogService _service = fixture.Services.GetRequiredService<ICatalogService>();
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    [Fact]
-    public async Task ListCatalogs_Returns_Test_Database()
-    {
-        var result = await _service.ListCatalogsAsync(cancellationToken: CancellationToken);
-
-        Assert.NotNull(result);
-        Assert.NotEmpty(result.Columns);
-        Assert.NotEmpty(result.Rows);
-
-        result.Columns.AssertHasColumns(
-            "name",
-            "state_desc",
-            "is_read_only",
-            "is_system_db");
-
-        Assert.Contains(
-            result.Rows,
-            r => r[0]?.ToString() == TestDatabaseName);
-    }
-
     // -----------------------------
-    // Schemas
+    // Routine definition
     // -----------------------------
-
-    [Fact]
-    public async Task ListSchemas_Returns_Dbo_Schema_For_Explicit_Catalog()
-    {
-        var result = await _service.ListSchemasAsync(TestDatabaseName, cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-        result.Columns.AssertHasColumns("name");
-
-        Assert.Contains(
-            result.Rows,
-            r => r[0]?.ToString() == "dbo");
-    }
-
-    [Fact]
-    public async Task ListSchemas_Without_Catalog_Uses_Default_Database()
-    {
-        var result = await _service.ListSchemasAsync(cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-        result.Columns.AssertHasColumns("name");
-
-        Assert.Contains(
-            result.Rows,
-            r => r[0]?.ToString() == "dbo");
-    }
-
-    // -----------------------------
-    // Relations (tables + views)
-    // -----------------------------
-
-    [Fact]
-    public async Task ListRelations_Returns_Tables_And_Views_For_Explicit_Scope()
-    {
-        var result = await _service.ListRelationsAsync(
-            catalog: TestDatabaseName,
-            schema: "dbo",
-            cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-
-        result.Columns.AssertHasColumns(
-            "name",
-            "type");
-
-        var names = result.Rows.Select(r => r[0]?.ToString()).ToList();
-
-        // tables
-        Assert.Contains("Users", names);
-        Assert.Contains("Orders", names);
-
-        // views
-        Assert.Contains("ActiveUsers", names);
-        Assert.Contains("OrderSummary", names);
-    }
-
-    [Fact]
-    public async Task ListRelations_Without_Parameters_Uses_Default_Scope()
-    {
-        var result = await _service.ListRelationsAsync(cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-
-        var names = result.Rows.Select(r => r[0]?.ToString()).ToList();
-
-        Assert.Contains("Users", names);
-        Assert.Contains("Orders", names);
-        Assert.Contains("ActiveUsers", names);
-        Assert.Contains("OrderSummary", names);
-    }
-
-    // -----------------------------
-    // Routines (procedures + functions)
-    // -----------------------------
-
-    [Fact]
-    public async Task ListRoutines_Returns_Procedures_And_Functions_For_Explicit_Scope()
-    {
-        var result = await _service.ListRoutinesAsync(
-            catalog: TestDatabaseName,
-            schema: "dbo",
-            cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-
-        result.Columns.AssertHasColumns(
-            "name",
-            "type");
-
-        var names = result.Rows.Select(r => r[0]?.ToString()).ToList();
-
-        // stored procedures
-        Assert.Contains("GetUserCount", names);
-        Assert.Contains("GetUserById", names);
-
-        // scalar functions
-        Assert.Contains("GetUserEmail", names);
-        Assert.Contains("GetTotalOrderAmount", names);
-    }
 
     [Fact]
     public async Task GetRoutineDefinition_Returns_NonEmpty_Definition_For_Existing_Routine()
@@ -164,37 +45,6 @@ public sealed class CatalogServiceTests(SqlServerFixture fixture) : SqlServerFun
         Assert.Empty(result.Rows);
     }
 
-    [Fact]
-    public async Task ListRoutines_IncludeSystem_Returns_Superset()
-    {
-        var userOnly = await _service.ListRoutinesAsync(
-            catalog: TestDatabaseName, schema: "dbo",
-            cancellationToken: CancellationToken);
-
-        var withSystem = await _service.ListRoutinesAsync(
-            catalog: TestDatabaseName,
-            schema: "dbo",
-            includeSystem: true,
-            cancellationToken: CancellationToken);
-
-        Assert.True(withSystem.Rows.Count >= userOnly.Rows.Count);
-    }
-
-    [Fact]
-    public async Task ListRoutines_Without_Parameters_Uses_Default_Scope()
-    {
-        var result = await _service.ListRoutinesAsync(cancellationToken: CancellationToken);
-
-        Assert.NotEmpty(result.Rows);
-
-        var names = result.Rows.Select(r => r[0]?.ToString()).ToList();
-
-        Assert.Contains("GetUserCount", names);
-        Assert.Contains("GetUserById", names);
-        Assert.Contains("GetUserEmail", names);
-        Assert.Contains("GetTotalOrderAmount", names);
-    }
-
     // -----------------------------
     // GetObject – combined includes
     // -----------------------------
@@ -222,7 +72,11 @@ public sealed class CatalogServiceTests(SqlServerFixture fixture) : SqlServerFun
             "filter_definition", "key_ordinal", "is_descending", "column_name", "is_included_column");
 
         Assert.Null(result.Constraints);
+        Assert.Null(result.Relationships);
         Assert.Null(result.Definition);
+
+        // Always-on for relations, independent of includes.
+        Assert.NotNull(result.RowCount);
     }
 
     // -----------------------------
@@ -353,5 +207,154 @@ public sealed class CatalogServiceTests(SqlServerFixture fixture) : SqlServerFun
         Assert.NotEmpty(result.ForeignKeys.Rows);
         Assert.NotEmpty(result.CheckConstraints.Rows);
         Assert.NotEmpty(result.DefaultConstraints.Rows);
+    }
+    // -----------------------------
+    // Describe relationships
+    // -----------------------------
+
+    private static IEnumerable<string?> Column(Alyio.McpMssql.Models.TabularResult result, string column)
+    {
+        var index = result.Columns
+            .Select((name, i) => (name, i))
+            .First(c => string.Equals(c.name, column, StringComparison.OrdinalIgnoreCase)).i;
+
+        return result.Rows.Select(r => r[index]?.ToString());
+    }
+
+    [Fact]
+    public async Task DescribeRelationships_Orders_Returns_Outgoing_Edge_To_Users()
+    {
+        var result = await _service.DescribeRelationshipsAsync(
+            "Orders",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            cancellationToken: CancellationToken);
+
+        result.Columns.AssertHasColumns(
+            "direction", "fk_name", "parent_schema", "parent_table", "parent_column",
+            "referenced_schema", "referenced_table", "referenced_column",
+            "delete_action", "update_action");
+
+        Assert.NotEmpty(result.Rows);
+        Assert.Contains("outgoing", Column(result, "direction"));
+        Assert.Contains("Users", Column(result, "referenced_table"));
+        Assert.Contains("UserId", Column(result, "referenced_column"));
+    }
+
+    [Fact]
+    public async Task DescribeRelationships_Users_Returns_Incoming_Edge_From_Orders()
+    {
+        var result = await _service.DescribeRelationshipsAsync(
+            "Users",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            cancellationToken: CancellationToken);
+
+        Assert.NotEmpty(result.Rows);
+        Assert.Contains("incoming", Column(result, "direction"));
+        Assert.Contains("Orders", Column(result, "parent_table"));
+    }
+
+    [Fact]
+    public async Task GetObject_Relationships_Include_Returns_Edges_For_Relation()
+    {
+        var result = await ObjectTools.GetObjectAsync(
+            _service,
+            ObjectKind.Relation,
+            "Orders",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            includes: [ObjectInclude.Relationships],
+            cancellationToken: CancellationToken);
+
+        Assert.NotNull(result.Relationships);
+        Assert.NotEmpty(result.Relationships.Rows);
+        Assert.Null(result.Columns);
+    }
+
+    // -----------------------------
+    // Row count
+    // -----------------------------
+
+    [Fact]
+    public async Task GetRowCount_Returns_Seeded_Count_For_Table()
+    {
+        var count = await _service.GetRowCountAsync(
+            "Users",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            cancellationToken: CancellationToken);
+
+        Assert.NotNull(count);
+        Assert.True(count > 0, $"Expected a positive row count, got {count}.");
+    }
+
+    [Fact]
+    public async Task GetRowCount_Returns_Null_For_View()
+    {
+        var count = await _service.GetRowCountAsync(
+            "ActiveUsers",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            cancellationToken: CancellationToken);
+
+        Assert.Null(count);
+    }
+
+    [Fact]
+    public async Task GetObject_RowCount_Is_Null_For_Routine()
+    {
+        var result = await ObjectTools.GetObjectAsync(
+            _service,
+            ObjectKind.Routine,
+            "GetUserCount",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            includes: [ObjectInclude.Definition],
+            cancellationToken: CancellationToken);
+
+        Assert.NotNull(result.Definition);
+        Assert.Null(result.RowCount);
+    }
+
+    // -----------------------------
+    // Includes default and name resolution
+    // -----------------------------
+
+    [Fact]
+    public async Task GetObject_Without_Includes_Defaults_To_Columns()
+    {
+        var result = await ObjectTools.GetObjectAsync(
+            _service,
+            ObjectKind.Relation,
+            "Users",
+            catalog: TestDatabaseName,
+            schema: "dbo",
+            cancellationToken: CancellationToken);
+
+        Assert.NotNull(result.Columns);
+        Assert.NotEmpty(result.Columns.Rows);
+        Assert.Null(result.Indexes);
+    }
+
+    [Theory]
+    [InlineData("Users", "dbo")]
+    [InlineData("dbo.Users", null)]
+    [InlineData("[dbo].[Users]", null)]
+    [InlineData("[Users]", "dbo")]
+    public async Task GetObject_Accepts_Qualified_And_Bracketed_Names(string name, string? schema)
+    {
+        var result = await ObjectTools.GetObjectAsync(
+            _service,
+            ObjectKind.Relation,
+            name,
+            catalog: TestDatabaseName,
+            schema: schema,
+            includes: [ObjectInclude.Columns],
+            cancellationToken: CancellationToken);
+
+        Assert.NotNull(result.Columns);
+        result.Columns.Columns.AssertHasColumns("name", "type", "is_nullable", "column_id");
+        Assert.NotEmpty(result.Columns.Rows);
     }
 }
