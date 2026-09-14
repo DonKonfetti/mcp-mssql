@@ -101,5 +101,5 @@ Follow existing project conventions.
 Normative, high-density metadata: enough for correct tool and parameter selection, minimal to reduce token cost.
 
 - **The `DescriptionAttribute` statement MUST start with [MSSQL], followed by a Verb-Object fragment, e.g., `[MSSQL] Execute Read-only T-SQL`.**
-- **Use tag-based lineage (Src: <Entity>) for parameters that refer to server or database entities** (e.g. profile name → Src: profiles, catalog → Src: catalogs).
+- **Use tag-based lineage (Src: <Entity>) for parameters that refer to server or database entities** (profile → Src: profiles, catalog → Src: sys.databases, plan id → Src: analyze_query). Prefer a catalog view to a tool name.
 
