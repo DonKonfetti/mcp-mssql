@@ -27,13 +27,13 @@ public static class ObjectTools
         ICatalogService catalogService,
         [Description("relation | routine.")]
         ObjectKind kind,
-        [Description("Users | dbo.Users | [dbo].[Users]. analyze_query missing_indexes[].table works as-is. Src: run_query.")]
+        [Description("Users | dbo.Users | [dbo].[Users]. analyze_query missing_indexes[].table works as-is. Src: sys.objects.")]
         string name,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
-        [Description("If omitted, uses the active catalog. Src: run_query (sys.databases).")]
+        [Description("If omitted, uses the active catalog. Src: sys.databases.")]
         string? catalog = null,
-        [Description("If omitted, taken from name when qualified, else default resolution. Src: run_query (sys.schemas).")]
+        [Description("If omitted, taken from name when qualified, else default resolution. Src: sys.schemas.")]
         string? schema = null,
         [Description("Omit → columns. relations: columns, indexes, constraints, relationships; routines: definition.")]
         IReadOnlyList<ObjectInclude>? includes = null,

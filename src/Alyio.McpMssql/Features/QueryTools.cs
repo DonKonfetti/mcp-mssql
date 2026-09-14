@@ -30,7 +30,7 @@ public static class QueryTools
         string sql,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
-        [Description("If omitted, uses the active catalog on the connection. Src: run_query (sys.databases).")]
+        [Description("If omitted, uses the active catalog on the connection. Src: sys.databases.")]
         string? catalog = null,
         [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
@@ -60,7 +60,7 @@ public static class QueryTools
         string sql,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
-        [Description("If omitted, uses the active catalog on the connection. Src: run_query (sys.databases).")]
+        [Description("If omitted, uses the active catalog on the connection. Src: sys.databases.")]
         string? catalog = null,
         [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
