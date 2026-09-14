@@ -103,7 +103,7 @@ internal abstract partial class ContentStore : IContentStore
 
     public async Task<string?> TryGetAsync(string id, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (!IsValidId(id))
         {
             return null;
         }
@@ -223,6 +223,10 @@ internal abstract partial class ContentStore : IContentStore
 
     private string GetFilePath(string id)
         => Path.Combine(_directory, $"{id}{_fileExtension}");
+
+    private static bool IsValidId(string? id)
+        => id is { Length: 8 }
+            && id.All(static c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
 
     private void TryDeleteFile(string path)
     {

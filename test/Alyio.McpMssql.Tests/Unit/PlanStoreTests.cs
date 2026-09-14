@@ -57,9 +57,46 @@ public class PlanStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Returns_Null_For_Unknown_Id()
     {
-        var result = await _store.TryGetAsync("nonexistent", CancellationToken);
+        var result = await _store.TryGetAsync("deadbeef", CancellationToken);
 
         Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData("DEADBEEF")]
+    [InlineData("deadbee")]
+    [InlineData("deadbeeg")]
+    public async Task TryGet_Rejects_Invalid_Id_When_Matching_File_Exists(string id)
+    {
+        Directory.CreateDirectory(_plansDirectory);
+        await File.WriteAllTextAsync(
+            Path.Combine(_plansDirectory, $"{id}{PlanFileExtension}"),
+            SampleXml,
+            CancellationToken);
+
+        var result = await _store.TryGetAsync(id, CancellationToken);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task TryGet_Rejects_Id_That_Escapes_Store_Directory()
+    {
+        Directory.CreateDirectory(_plansDirectory);
+        const string outsideId = "../abcde";
+        var outsidePath = Path.Combine(_plansDirectory, $"{outsideId}{PlanFileExtension}");
+        await File.WriteAllTextAsync(outsidePath, SampleXml, CancellationToken);
+
+        try
+        {
+            var result = await _store.TryGetAsync(outsideId, CancellationToken);
+
+            Assert.Null(result);
+        }
+        finally
+        {
+            File.Delete(outsidePath);
+        }
     }
 
     [Fact]
