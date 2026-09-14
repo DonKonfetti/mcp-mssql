@@ -575,6 +575,7 @@
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.Hosting": "[10.0.11, )",
           "Microsoft.Extensions.Options.DataAnnotations": "[10.0.11, )",
+          "Microsoft.SqlServer.TransactSql.ScriptDom": "[180.107.0, )",
           "ModelContextProtocol": "[2.2.0, )"
         }
       },
@@ -641,6 +642,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
           "Microsoft.Extensions.Options": "10.0.11"
         }
+      },
+      "Microsoft.SqlServer.TransactSql.ScriptDom": {
+        "type": "CentralTransitive",
+        "requested": "[180.107.0, )",
+        "resolved": "180.107.0",
+        "contentHash": "81MHhvTJW/pNzYh5WhM8QgV4YhlwY3Vmm6sQUiE88IaJzrzqJbIb38JPdjqn54I83/goE1A1ArzEw5hAmc6/pQ=="
       },
       "ModelContextProtocol": {
         "type": "CentralTransitive",
@@ -1274,6 +1281,7 @@
           "Microsoft.Data.SqlClient": "[7.0.2, )",
           "Microsoft.Extensions.Hosting": "[10.0.11, )",
           "Microsoft.Extensions.Options.DataAnnotations": "[10.0.11, )",
+          "Microsoft.SqlServer.TransactSql.ScriptDom": "[180.107.0, )",
           "ModelContextProtocol": "[2.2.0, )"
         }
       },
@@ -1340,6 +1348,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.11",
           "Microsoft.Extensions.Options": "10.0.11"
         }
+      },
+      "Microsoft.SqlServer.TransactSql.ScriptDom": {
+        "type": "CentralTransitive",
+        "requested": "[180.107.0, )",
+        "resolved": "180.107.0",
+        "contentHash": "81MHhvTJW/pNzYh5WhM8QgV4YhlwY3Vmm6sQUiE88IaJzrzqJbIb38JPdjqn54I83/goE1A1ArzEw5hAmc6/pQ=="
       },
       "ModelContextProtocol": {
         "type": "CentralTransitive",
