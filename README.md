@@ -147,9 +147,7 @@ All tools accept an optional `profile`; when omitted, the default profile is use
 | URI template | Description |
 |---|---|
 | `mssql://profiles` | List configured connection profiles. Same data as `list_profiles`. |
-| `mssql://server-properties?{profile}` | Get server properties and execution limits. Same data as `get_server_properties`. |
-| `mssql://objects?{kind,profile,catalog,schema}` | List catalog metadata. Schema omission behavior matches `list_objects`. |
-| `mssql://objects/{kind}/{name}{?profile,catalog,schema,includes}` | Get metadata for one relation or routine. `includes` is required. |
+| `mssql://server-properties{?profile}` | Get server properties and execution limits. Same data as `get_server_properties`. |
 | `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`; entries expire after 7 days. |
 | `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 1 day. |
 
