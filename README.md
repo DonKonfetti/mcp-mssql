@@ -159,6 +159,20 @@ Resources mirror their corresponding tools and return JSON (except `mssql://plan
 
 The query tools (`run_query`, `analyze_query`) are read-only (`SELECT` only) and use parameterized `@paramName` binding. Use environment variables or user-secrets for connection strings—never commit secrets.
 
+**What counts as read-only.** The SQL is parsed with ScriptDom and must be exactly one `SELECT` statement in a single batch — not merely text that begins with `SELECT`. Multi-statement and `GO`-separated scripts are rejected, and so are these, despite being syntactically `SELECT`s:
+
+| Rejected | Reason |
+|---|---|
+| `SELECT ... INTO` | Materializes a new table. |
+| `SELECT @v = ...` | Assigns a variable, mutating session state. |
+| `NEXT VALUE FOR` | Advances a sequence. |
+| `OPENQUERY`, `OPENDATASOURCE`, `OPENROWSET`, `OPENROWSET(BULK ...)` | Reads through an ad-hoc external data source. |
+| `UPDLOCK`, `XLOCK`, `TABLOCK`, `TABLOCKX`, `HOLDLOCK`, `SERIALIZABLE`, `REPEATABLEREAD` | Take locks that impede concurrent writers. |
+
+Hints that acquire no extra locks, such as `NOLOCK`, `ROWLOCK` and `READPAST`, stay allowed. Input longer than 64 KB or nested more than 100 parentheses deep is also refused, which keeps the recursive-descent parser clear of a stack overflow.
+
+Like `AllowWrite` below, this constrains what this server will send — it is not a database permission.
+
 **Writes are opt-in.** The `run_command` tool executes arbitrary T-SQL. It is rejected unless the target profile sets `AllowWrite=true`, which defaults to `false`, so existing deployments stay read-only with no change. The tool is always advertised and rejects at call time on locked profiles.
 
 `AllowWrite` is a soft, application-level guard, **not** a security boundary — it constrains this server, not the database. For a genuine read-only guarantee, connect with a login restricted to `db_datareader`, and keep write-enabled profiles pointed at credentials scoped to only what they need. `run_command` is marked `destructive` via MCP tool annotations so hosts can gate it behind confirmation, but honor those annotations at the host's discretion.
