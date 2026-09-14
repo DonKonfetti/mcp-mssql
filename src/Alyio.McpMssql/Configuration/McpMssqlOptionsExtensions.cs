@@ -23,6 +23,11 @@ public static partial class McpMssqlOptionsExtensions
     /// </summary>
     public static IServiceCollection AddMcpMssqlOptions(this IServiceCollection services, IConfiguration configuration)
     {
+        // The clamp warnings below need a logger, and this method is callable
+        // on a bare collection, so guarantee one rather than require callers
+        // to register logging first. AddLogging is idempotent.
+        services.AddLogging();
+
         services
             .AddOptions<McpMssqlOptions>()
             .Bind(configuration.GetSection("McpMssql"))
