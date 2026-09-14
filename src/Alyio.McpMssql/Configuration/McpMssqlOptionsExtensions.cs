@@ -2,6 +2,7 @@
 
 using Alyio.McpMssql.Configuration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 #pragma warning disable IDE0130 // Intentional: extension methods for IServiceCollection
 namespace Microsoft.Extensions.DependencyInjection;
@@ -10,7 +11,7 @@ namespace Microsoft.Extensions.DependencyInjection;
 /// <summary>
 /// Dependency injection helpers for the MCP SQL Server integration.
 /// </summary>
-public static class McpMssqlOptionsExtensions
+public static partial class McpMssqlOptionsExtensions
 {
     /// <summary>
     /// Registers and validates MCP MSSQL configuration options.
@@ -25,11 +26,13 @@ public static class McpMssqlOptionsExtensions
         services
             .AddOptions<McpMssqlOptions>()
             .Bind(configuration.GetSection("McpMssql"))
-            .PostConfigure(options =>
+            .PostConfigure<ILoggerFactory>((options, loggerFactory) =>
             {
+                ILogger logger = loggerFactory.CreateLogger(typeof(McpMssqlOptionsExtensions));
+
                 EnsureProfilesExist(options);
                 DefaultProfileOverrideApplier.Apply(configuration, options);
-                ValidateAndNormalize(options);
+                ValidateAndNormalize(options, logger);
             })
             .ValidateOnStart();
 
@@ -54,7 +57,7 @@ public static class McpMssqlOptionsExtensions
         }
     }
 
-    private static void ValidateAndNormalize(McpMssqlOptions options)
+    private static void ValidateAndNormalize(McpMssqlOptions options, ILogger logger)
     {
         if (!options.Profiles.TryGetValue(McpMssqlOptions.DefaultProfileName, out _))
         {
@@ -72,9 +75,11 @@ public static class McpMssqlOptionsExtensions
 
             }
 
-            ClampQueryOptions(profile.Query);
-            ClampAnalyzeOptions(profile.Analyze);
-            ClampWriteOptions(profile.Write);
+            var profileName = name ?? "<unnamed>";
+
+            ClampQueryOptions(profile.Query, logger, profileName);
+            ClampAnalyzeOptions(profile.Analyze, logger, profileName);
+            ClampWriteOptions(profile.Write, logger, profileName);
         }
     }
 
@@ -82,44 +87,99 @@ public static class McpMssqlOptionsExtensions
     // Normalization helpers
     // -------------------------
 
-    private static void ClampQueryOptions(QueryOptions query)
+    private static void ClampQueryOptions(QueryOptions query, ILogger logger, string profile)
     {
-        query.MaxRows = Math.Clamp(
+        query.MaxRows = Clamp(
+            logger,
+            profile,
+            "Query:MaxRows",
             query.MaxRows,
             min: 1,
             max: QueryOptions.HardRowLimit);
 
-        query.CommandTimeoutSeconds = Math.Clamp(
+        query.CommandTimeoutSeconds = Clamp(
+            logger,
+            profile,
+            "Query:CommandTimeoutSeconds",
             query.CommandTimeoutSeconds,
             min: 1,
             max: QueryOptions.HardCommandTimeoutSeconds);
 
-        query.SnapshotMaxRows = Math.Clamp(
+        query.SnapshotMaxRows = Clamp(
+            logger,
+            profile,
+            "Query:SnapshotMaxRows",
             query.SnapshotMaxRows,
             min: 1,
             max: QueryOptions.HardSnapshotRowLimit);
 
-        query.SnapshotCommandTimeoutSeconds = Math.Clamp(
+        query.SnapshotCommandTimeoutSeconds = Clamp(
+            logger,
+            profile,
+            "Query:SnapshotCommandTimeoutSeconds",
             query.SnapshotCommandTimeoutSeconds,
             min: 1,
             max: QueryOptions.HardSnapshotCommandTimeoutSeconds);
     }
 
-    private static void ClampAnalyzeOptions(AnalyzeOptions analyze)
+    private static void ClampAnalyzeOptions(AnalyzeOptions analyze, ILogger logger, string profile)
     {
-        analyze.CommandTimeoutSeconds = Math.Clamp(
+        analyze.CommandTimeoutSeconds = Clamp(
+            logger,
+            profile,
+            "Analyze:CommandTimeoutSeconds",
             analyze.CommandTimeoutSeconds,
             min: 1,
             max: AnalyzeOptions.HardCommandTimeoutSeconds);
     }
 
-    private static void ClampWriteOptions(WriteOptions write)
+    private static void ClampWriteOptions(WriteOptions write, ILogger logger, string profile)
     {
-        write.CommandTimeoutSeconds = Math.Clamp(
+        write.CommandTimeoutSeconds = Clamp(
+            logger,
+            profile,
+            "Write:CommandTimeoutSeconds",
             write.CommandTimeoutSeconds,
             min: 1,
             max: WriteOptions.HardCommandTimeoutSeconds);
     }
+
+    /// <summary>
+    /// Clamps a configured value to its hard bounds, reporting any adjustment.
+    /// </summary>
+    /// <remarks>
+    /// The hard bounds are compile-time invariants, so a configured value
+    /// outside them is silently ignored at runtime. Logging the adjustment is
+    /// the only signal the operator gets that the effective value differs from
+    /// what they wrote.
+    /// </remarks>
+    private static int Clamp(
+        ILogger logger,
+        string profile,
+        string setting,
+        int configured,
+        int min,
+        int max)
+    {
+        var effective = Math.Clamp(configured, min, max);
+
+        if (effective != configured)
+        {
+            LogClamped(logger, setting, profile, configured, effective);
+        }
+
+        return effective;
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Clamped {Setting} for MCP MSSQL profile '{Profile}': configured {Configured}, effective {Effective}.")]
+    private static partial void LogClamped(
+        ILogger logger,
+        string setting,
+        string profile,
+        int configured,
+        int effective);
 
 }
 

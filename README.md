@@ -114,6 +114,8 @@ Example (`appsettings.json`):
 }
 ```
 
+Values above a hard ceiling are clamped to it at startup, and each adjustment is logged as a warning on stderr.
+
 **Local development:** Store the connection string in user-secrets, then run with `DOTNET_ENVIRONMENT=Development` so secrets load.
 
 ```bash
@@ -132,9 +134,8 @@ All tools accept an optional `profile`; when omitted, the default profile is use
 | Tool | Description | Key params |
 |---|---|---|
 | **`list_profiles`** | List configured connection profiles. Call first when picking a non-default profile. | — |
-| **`get_server_properties`** | Get server properties and execution limits (timeouts, row caps, guardrails). | `profile` |
 | **`get_object`** | Get metadata for one relation (columns, indexes, constraints, relationships) or routine (definition). `name` accepts `Users`, `dbo.Users` or `[dbo].[Users]`. `includes` omitted → `columns`. Relations also carry an approximate `row_count`. | `kind`, `name`, `profile`, `catalog`, `schema`, `includes` |
-| **`run_query`** | Execute read-only T-SQL SELECT; only SELECT allowed (no DML/DDL). Returns results as CSV in the `data` field (inline) or a snapshot resource URI when `snapshot=true`. Inline limit: 500 rows (hard ceiling 1000). Snapshot limit: 10 000 rows. Prefer `analyze_query` for plan tuning. | `sql`, `profile`, `catalog`, `parameters`, `snapshot` |
+| **`run_query`** | Execute read-only T-SQL SELECT; only SELECT allowed (no DML/DDL). Returns results as CSV in the `data` field (inline) or a snapshot resource URI when `snapshot=true`. Inline limit: 500 rows (hard ceiling 1000). Snapshot limit: 10 000 rows (hard ceiling 50 000). Prefer `analyze_query` for plan tuning. | `sql`, `profile`, `catalog`, `parameters`, `snapshot` |
 | **`analyze_query`** | Analyze execution plan for a read-only SELECT. Returns compact JSON summary (cost, operators, cardinality, warnings, `missing_indexes`, waits, stats); no result rows, full XML at `plan_uri`. | `sql`, `profile`, `catalog`, `parameters`, `estimated` |
 | **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless the target `profile` sets `AllowWrite=true` (off by default). Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
 
@@ -148,7 +149,6 @@ Catalog browsing is left to `run_query` over `sys.objects`, `sys.schemas` and `s
 | URI template | Description |
 |---|---|
 | `mssql://profiles` | List configured connection profiles. Same data as `list_profiles`. |
-| `mssql://server-properties{?profile}` | Get server properties and execution limits. Same data as `get_server_properties`. |
 | `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`; entries expire after 7 days. |
 | `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 1 day. |
 
