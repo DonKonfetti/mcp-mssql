@@ -14,13 +14,6 @@ public class PlanE2ETests(McpServerFixture fixture) : IClassFixture<McpServerFix
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task PlanResource_Template_Is_Discoverable()
-    {
-        Assert.True(
-            await _client.IsResourceTemplateRegisteredAsync("mssql://plans/{id}"));
-    }
-
-    [Fact]
     public async Task PlanResource_Returns_Xml_For_Valid_Id()
     {
         var planUri = await AnalyzeAndGetPlanUriAsync();

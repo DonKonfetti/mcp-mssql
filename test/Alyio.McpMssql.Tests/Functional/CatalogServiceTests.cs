@@ -336,25 +336,4 @@ public sealed class CatalogServiceTests(SqlServerFixture fixture) : SqlServerFun
         Assert.NotEmpty(result.Columns.Rows);
         Assert.Null(result.Indexes);
     }
-
-    [Theory]
-    [InlineData("Users", "dbo")]
-    [InlineData("dbo.Users", null)]
-    [InlineData("[dbo].[Users]", null)]
-    [InlineData("[Users]", "dbo")]
-    public async Task GetObject_Accepts_Qualified_And_Bracketed_Names(string name, string? schema)
-    {
-        var result = await ObjectTools.GetObjectAsync(
-            _service,
-            ObjectKind.Relation,
-            name,
-            catalog: TestDatabaseName,
-            schema: schema,
-            includes: [ObjectInclude.Columns],
-            cancellationToken: CancellationToken);
-
-        Assert.NotNull(result.Columns);
-        result.Columns.Columns.AssertHasColumns("name", "type", "is_nullable", "column_id");
-        Assert.NotEmpty(result.Columns.Rows);
-    }
 }

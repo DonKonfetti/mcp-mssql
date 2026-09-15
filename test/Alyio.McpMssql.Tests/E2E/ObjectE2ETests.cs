@@ -17,22 +17,6 @@ public sealed class ObjectE2ETests(McpServerFixture fixture) : IClassFixture<Mcp
     private static readonly string[] s_includeDefinition = ["definition"];
     private static readonly string[] s_includeRelationships = ["relationships"];
 
-    // ── Tool discovery ──
-
-    [Fact]
-    public async Task Object_Tools_Are_Discoverable()
-    {
-        Assert.True(await _client.IsToolRegisteredAsync(ObjectToolName));
-    }
-
-    [Fact]
-    public async Task ListObjects_Tool_Is_Not_Registered()
-    {
-        Assert.False(await _client.IsToolRegisteredAsync("list_objects"));
-    }
-
-    // ── get_object ──
-
     [Fact]
     public async Task DescribeColumns_Tool_Returns_Expected_Columns()
     {

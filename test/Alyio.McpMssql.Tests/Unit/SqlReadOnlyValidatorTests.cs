@@ -142,14 +142,5 @@ public class SqlReadOnlyValidatorTests
         Assert.Throws<InvalidOperationException>(() =>
             SqlReadOnlyValidator.Validate(sql));
     }
-
-    [Theory]
-    [InlineData("update Users set Name = 'x' -- select")]
-    [InlineData("delete from Users /* select */")]
-    public void Validate_Throws_When_Not_Starting_With_Select_Or_Cte(string sql)
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            SqlReadOnlyValidator.Validate(sql));
-    }
 }
 

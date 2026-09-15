@@ -20,7 +20,6 @@ public sealed class McpServerFixture : IAsyncLifetime
     private readonly CancellationTokenSource _cts = new();
     private Task? _serverRunTask;
     private ServiceProvider? _serviceProvider;
-    private ITransport? _clientTransport;
     private ITransport? _serverTransport;
 
     /// <summary>
@@ -66,7 +65,6 @@ public sealed class McpServerFixture : IAsyncLifetime
         // 4. Start Client
         var loggerFactory = _serviceProvider.GetRequiredService<ILoggerFactory>();
         var clientTransportWrapper = new InMemoryClientTransport(clientInput, clientOutput, loggerFactory);
-        _clientTransport = clientTransportWrapper.Transport;
 
         Client = await McpClient.CreateAsync(clientTransportWrapper, loggerFactory: loggerFactory);
     }
@@ -79,10 +77,9 @@ public sealed class McpServerFixture : IAsyncLifetime
         // Signal shutdown
         await _cts.CancelAsync();
 
-        // Dispose in order: Client -> Server -> Transports
+        // Dispose in order: Client -> Server -> Transport
         if (Client != null) await Client.DisposeAsync();
         if (Server != null) await Server.DisposeAsync();
-        if (_clientTransport != null) await _clientTransport.DisposeAsync();
         if (_serverTransport != null) await _serverTransport.DisposeAsync();
 
         if (_serverRunTask != null)

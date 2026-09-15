@@ -12,14 +12,7 @@ public class SnapshotE2ETests(McpServerFixture fixture) : IClassFixture<McpServe
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Snapshot_Resource_Template_Is_Discoverable()
-    {
-        Assert.True(
-            await _client.IsResourceTemplateRegisteredAsync("mssql://snapshots/{id}"));
-    }
-
-    [Fact]
-    public async Task RunQuery_Snapshot_Returns_Uri_Without_Data_Field()
+    public async Task RunQuery_Snapshot_Returns_Uri_That_Round_Trips_To_Csv()
     {
         var result = await _client.CallToolAsync(
             RunQueryTool,
@@ -28,38 +21,19 @@ public class SnapshotE2ETests(McpServerFixture fixture) : IClassFixture<McpServe
 
         Assert.True(result.IsError is not true);
 
+        // The rows travel by URI, never inline.
         var root = result.ReadJsonRoot();
-        Assert.True(root.TryGetProperty("snapshot_uri", out var uri));
-        Assert.StartsWith("mssql://snapshots/", uri.GetString());
-
         Assert.False(root.TryGetProperty("data", out _));
+        Assert.Equal(1, root.GetProperty("row_count").GetInt32());
 
-        Assert.True(root.TryGetProperty("row_count", out var rowCount));
-        Assert.Equal(1, rowCount.GetInt32());
-    }
-
-    [Fact]
-    public async Task RunQuery_Snapshot_Round_Trip_Returns_Csv()
-    {
-        var result = await _client.CallToolAsync(
-            RunQueryTool,
-            new Dictionary<string, object?> { ["sql"] = "SELECT 1 AS Value", ["snapshot"] = true },
-            cancellationToken: CancellationToken);
-
-        Assert.True(result.IsError is not true);
-
-        var root = result.ReadJsonRoot();
         var snapshotUri = root.GetProperty("snapshot_uri").GetString()!;
+        Assert.StartsWith("mssql://snapshots/", snapshotUri);
 
         var resource = await _client.ReadResourceAsync(snapshotUri, cancellationToken: CancellationToken);
         var csv = resource.ReadAsText();
 
-        Assert.NotEmpty(csv);
-        var headers = TabularAssertions.ParseCsvHeaders(csv);
-        var rows = TabularAssertions.ParseCsvDataRows(csv);
-
-        Assert.Equal("Value", headers[0]);
-        var row = Assert.Single(rows);
+        Assert.Equal("Value", TabularAssertions.ParseCsvHeaders(csv)[0]);
+        var row = Assert.Single(TabularAssertions.ParseCsvDataRows(csv));
         Assert.Equal("1", row[0]);
     }
 

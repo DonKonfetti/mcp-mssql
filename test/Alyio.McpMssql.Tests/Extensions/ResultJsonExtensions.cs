@@ -34,28 +34,11 @@ internal static class ResultJsonExtensions
         return doc.RootElement.Clone();
     }
 
-    public static (JsonElement columns, JsonElement rows) ReadColumnRows(this JsonElement root)
-    {
-        return (
-            root.GetProperty("columns"),
-            root.GetProperty("rows")
-        );
-    }
-
-    /// <summary>Reads columns and rows from a nested table (e.g. SchemaResult.columns).</summary>
+    /// <summary>Reads columns and rows from a nested table (e.g. ObjectResult.columns).</summary>
     public static (JsonElement columns, JsonElement rows) ReadColumnRowsFrom(this JsonElement root, string tableKey)
     {
-        var table = root.TryGetProperty(tableKey, out var t) ? t : root.GetProperty(tableKey);
+        var table = root.GetProperty(tableKey);
         return (table.GetProperty("columns"), table.GetProperty("rows"));
-    }
-
-    public static (bool truncated, int rowLimit, int rowCount) ReadMeta(this JsonElement root)
-    {
-        return (
-            root.GetProperty("truncated").GetBoolean(),
-            root.GetProperty("row_limit").GetInt32(),
-            root.GetProperty("row_count").GetInt32()
-        );
     }
 
     /// <summary>

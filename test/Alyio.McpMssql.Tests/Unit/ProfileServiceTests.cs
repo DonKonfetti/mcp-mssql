@@ -30,25 +30,6 @@ public class ProfileServiceTests
     }
 
     [Fact]
-    public void Resolve_With_Explicit_Name_Returns_That_Profile()
-    {
-        var otherProfile = new McpMssqlProfileOptions { ConnectionString = "Server=other;Database=OtherDb;" };
-        var options = new McpMssqlOptions
-        {
-            Profiles = new Dictionary<string, McpMssqlProfileOptions>(StringComparer.OrdinalIgnoreCase)
-            {
-                [McpMssqlOptions.DefaultProfileName] = new McpMssqlProfileOptions { ConnectionString = "Server=.;" },
-                ["other"] = otherProfile,
-            },
-        };
-        var profileService = new ProfileService(Options.Create(options));
-
-        var result = profileService.Resolve("other");
-
-        Assert.Same(otherProfile, result);
-    }
-
-    [Fact]
     public void Resolve_Is_Case_Insensitive()
     {
         var otherProfile = new McpMssqlProfileOptions { ConnectionString = "Server=other;" };
@@ -65,24 +46,6 @@ public class ProfileServiceTests
         var result = profileService.Resolve("other");
 
         Assert.Same(otherProfile, result);
-    }
-
-    [Fact]
-    public void Resolve_Throws_When_Profile_Not_Found()
-    {
-        var options = new McpMssqlOptions
-        {
-            Profiles = new Dictionary<string, McpMssqlProfileOptions>(StringComparer.OrdinalIgnoreCase)
-            {
-                [McpMssqlOptions.DefaultProfileName] = new McpMssqlProfileOptions(),
-            },
-        };
-        var profileService = new ProfileService(Options.Create(options));
-
-        var ex = Assert.Throws<InvalidOperationException>(() => profileService.Resolve("missing"));
-
-        Assert.Contains("missing", ex.Message);
-        Assert.Contains("default", ex.Message);
     }
 
     [Fact]

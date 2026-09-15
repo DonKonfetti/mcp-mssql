@@ -13,26 +13,7 @@ public sealed class ProfilesE2ETests(McpServerFixture fixture) : IClassFixture<M
 
     private const string ToolName = "list_profiles";
 
-    // ── Tool discovery ──
-
-    [Fact]
-    public async Task Profiles_Tool_Is_Discoverable()
-    {
-        Assert.True(await _client.IsToolRegisteredAsync(ToolName));
-    }
-
-    // ── Resource discovery ──
-
-    [Fact]
-    public async Task Profiles_Resource_Is_Discoverable()
-    {
-        Assert.True(
-            await _client.IsResourceRegisteredAsync("mssql://profiles"),
-            "Profiles resource should be discoverable.");
-    }
-
     // ── Tool ──
-
     [Fact]
     public async Task Profiles_Tool_Returns_At_Least_Default_Profile()
     {

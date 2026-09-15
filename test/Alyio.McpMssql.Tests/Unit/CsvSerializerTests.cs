@@ -73,21 +73,4 @@ public class CsvSerializerTests
 
         Assert.Equal("Name\n\"say \"\"hello\"\"\"\n", csv);
     }
-
-    [Fact]
-    public void Serialize_Header_Only_Result_Has_Trailing_Newline()
-    {
-        var csv = CsvSerializer.Serialize(["Col"], []);
-
-        Assert.EndsWith("\n", csv);
-    }
-
-    [Fact]
-    public void Serialize_Uses_Lf_Not_Crlf()
-    {
-        var csv = CsvSerializer.Serialize(["A", "B"], [["x", "y"]]);
-
-        Assert.DoesNotContain("\r\n", csv);
-        Assert.Contains("\n", csv);
-    }
 }

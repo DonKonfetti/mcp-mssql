@@ -85,19 +85,6 @@ public sealed class CatalogServiceLeastPrivilegeTests(SqlServerFixture fixture)
         => new(new StubProfileService(ReadOnlyConnectionString));
 
     [Fact]
-    public async Task GetRowCount_Returns_Count_For_DbDatareader_Login()
-    {
-        var count = await CreateReadOnlyCatalogService().GetRowCountAsync(
-            "Users",
-            catalog: TestDatabaseName,
-            schema: "dbo",
-            cancellationToken: CancellationToken);
-
-        Assert.NotNull(count);
-        Assert.True(count > 0, $"Expected a positive row count, got {count}.");
-    }
-
-    [Fact]
     public async Task GetRowCount_Matches_Admin_Count_For_DbDatareader_Login()
     {
         var admin = Fixture.Services.GetRequiredService<ICatalogService>();
@@ -107,6 +94,7 @@ public sealed class CatalogServiceLeastPrivilegeTests(SqlServerFixture fixture)
         var actual = await CreateReadOnlyCatalogService().GetRowCountAsync(
             "Users", catalog: TestDatabaseName, schema: "dbo", cancellationToken: CancellationToken);
 
+        Assert.NotNull(actual);
         Assert.Equal(expected, actual);
     }
 

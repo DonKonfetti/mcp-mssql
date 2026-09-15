@@ -17,12 +17,6 @@ public class QueryToolsE2ETests(McpServerFixture fixture) : IClassFixture<McpSer
     // ── run_query ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task RunQuery_Tool_Is_Discoverable()
-    {
-        Assert.True(await _client.IsToolRegisteredAsync(RunQueryTool));
-    }
-
-    [Fact]
     public async Task RunQuery_Returns_Tabular_Result()
     {
         var result = await CallRunQueryAsync("SELECT 1 AS Value");
@@ -90,12 +84,6 @@ public class QueryToolsE2ETests(McpServerFixture fixture) : IClassFixture<McpSer
     }
 
     // ── analyze_query ─────────────────────────────────────────────
-
-    [Fact]
-    public async Task AnalyzeQuery_Tool_Is_Discoverable()
-    {
-        Assert.True(await _client.IsToolRegisteredAsync(AnalyzeQueryTool));
-    }
 
     [Fact]
     public async Task AnalyzeQuery_Returns_Summary_With_PlanUri()

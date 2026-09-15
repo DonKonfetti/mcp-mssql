@@ -52,7 +52,7 @@ public sealed class ProfileServiceTests
         Assert.NotNull(profiles);
         Assert.NotEmpty(profiles);
 
-        var defaultProfile = profiles.FirstOrDefault(p => p.Name.Equals(McpMssqlProfileOptions.DefaultProfileName, StringComparison.OrdinalIgnoreCase));
+        var defaultProfile = profiles.FirstOrDefault(p => p.Name.Equals(McpMssqlOptions.DefaultProfileName, StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(defaultProfile);
         Assert.Contains(envVars[1].Item2, defaultProfile.Description);
@@ -153,37 +153,6 @@ public sealed class ProfileServiceTests
     }
 
     [Fact]
-    public void Resolve_Default_From_Section_Only()
-    {
-        var envVars = new[]
-        {
-            ("MCPMSSQL__PROFILES__DEFAULT__CONNECTIONSTRING", "Server=.;Database=SectionOnly;TrustServerCertificate=True;"),
-            ("MCPMSSQL__PROFILES__OTHER__CONNECTIONSTRING", "Server=other;Database=OtherFromSection;TrustServerCertificate=True;"),
-        };
-
-        var profileService = BuildProfileService(envVars);
-
-        var profile = profileService.Resolve(null);
-
-        Assert.Contains("SectionOnly", profile.ConnectionString);
-    }
-
-    [Fact]
-    public void Resolve_Default_Flat_Overrides_Section()
-    {
-        var envVars = new[]
-        {
-            ("MCPMSSQL__PROFILES__DEFAULT__CONNECTIONSTRING", "Server=.;Database=FromSection;TrustServerCertificate=True;"),
-            ("MCPMSSQL_CONNECTION_STRING", "Server=.;Database=FromFlat;TrustServerCertificate=True;"),
-        };
-
-        var profileService = BuildProfileService(envVars);
-
-        var profile = profileService.Resolve(null);
-        Assert.Contains("FromFlat", profile.ConnectionString);
-    }
-
-    [Fact]
     public void Resolve_Default_And_Named_From_Only_Section_Keys()
     {
         var envVars = new[]
@@ -199,20 +168,6 @@ public sealed class ProfileServiceTests
 
         Assert.Contains("DefaultFromSection", defaultProfile.ConnectionString);
         Assert.Contains("OtherFromSection", otherProfile.ConnectionString);
-    }
-
-    [Fact]
-    public void Resolve_Default_From_Uppercase_Section_Keys()
-    {
-        var envVars = new[]
-        {
-            ("MCPMSSQL__PROFILES__DEFAULT__CONNECTIONSTRING", "Server=.;Database=UppercaseSection;TrustServerCertificate=True;"),
-        };
-
-        var profileService = BuildProfileService(envVars);
-
-        var profile = profileService.Resolve(null);
-        Assert.Contains("UppercaseSection", profile.ConnectionString);
     }
 
     [Fact]

@@ -83,13 +83,19 @@ public class PlanParserTests
     }
 
     [Fact]
-    public void ParseStatement_Minimal_Has_No_MemoryGrant()
+    public void ParseStatement_Minimal_Reports_No_Findings()
     {
         var result = ParseInline(MinimalPlanXml);
 
         Assert.Null(result.Statement.MemoryGrant);
         Assert.Equal("TRIVIAL", result.Statement.OptimizationLevel);
         Assert.Equal(160, result.Statement.CeVersion);
+
+        Assert.Empty(result.CardinalityIssues);
+        Assert.Empty(result.Warnings);
+        Assert.Empty(result.MissingIndexes);
+        Assert.Empty(result.WaitStats);
+        Assert.Empty(result.Statistics);
     }
 
     [Fact]
@@ -133,7 +139,7 @@ public class PlanParserTests
     }
 
     [Fact]
-    public async Task ParseOperators_Users_Scan_Has_Highest_Cost()
+    public async Task ParseOperators_Users_Scan_Reports_Object_Mode_And_RowsRead()
     {
         var result = await ParseFixtureAsync();
 
@@ -142,6 +148,8 @@ public class PlanParserTests
         Assert.Equal("[dbo].[Users].[PK__Users__1788CC4C]", usersScan.ObjectName);
         Assert.True(usersScan.IsParallel);
         Assert.Equal("Row", usersScan.ExecutionMode);
+        Assert.Equal(100000, usersScan.EstimatedRowsRead);
+        Assert.Equal(5, usersScan.ActualRowsRead);
     }
 
     [Fact]
@@ -152,16 +160,6 @@ public class PlanParserTests
         // NodeId=3 (Users scan): Thread 0=0, Thread 1=1, Thread 2=0
         var usersScan = result.TopOperators.First(o => o.NodeId == 3);
         Assert.Equal(1, usersScan.ActualRows);
-    }
-
-    [Fact]
-    public async Task ParseOperators_Reports_RowsRead_For_Scan()
-    {
-        var result = await ParseFixtureAsync();
-
-        var usersScan = result.TopOperators.First(o => o.NodeId == 3);
-        Assert.Equal(100000, usersScan.EstimatedRowsRead);
-        Assert.Equal(5, usersScan.ActualRowsRead);
     }
 
     [Fact]
@@ -185,16 +183,6 @@ public class PlanParserTests
         Assert.False(ordersScan.IsParallel);
         Assert.Equal("[dbo].[Orders].[PK__Orders__C3905BCF]", ordersScan.ObjectName);
         Assert.Equal(7, ordersScan.ActualRows);
-    }
-
-    // --- Cardinality Issues ---
-
-    [Fact]
-    public void ParseCardinalityIssues_Minimal_Returns_Empty()
-    {
-        var result = ParseInline(MinimalPlanXml);
-
-        Assert.Empty(result.CardinalityIssues);
     }
 
     // --- Warnings ---
@@ -224,14 +212,6 @@ public class PlanParserTests
         Assert.Contains("UserName", convert.Detail);
     }
 
-    [Fact]
-    public void ParseWarnings_Minimal_Returns_Empty()
-    {
-        var result = ParseInline(MinimalPlanXml);
-
-        Assert.Empty(result.Warnings);
-    }
-
     // --- Missing Indexes ---
 
     [Fact]
@@ -247,14 +227,6 @@ public class PlanParserTests
         Assert.Contains("[UserId]", mi.IncludeColumns);
         Assert.Contains("[Email]", mi.IncludeColumns);
         Assert.Equal(78.32, mi.Impact);
-    }
-
-    [Fact]
-    public void ParseMissingIndexes_Minimal_Returns_Empty()
-    {
-        var result = ParseInline(MinimalPlanXml);
-
-        Assert.Empty(result.MissingIndexes);
     }
 
     // --- Wait Stats ---
@@ -278,14 +250,6 @@ public class PlanParserTests
         }
     }
 
-    [Fact]
-    public void ParseWaitStats_Minimal_Returns_Empty()
-    {
-        var result = ParseInline(MinimalPlanXml);
-
-        Assert.Empty(result.WaitStats);
-    }
-
     // --- Statistics ---
 
     [Fact]
@@ -299,14 +263,6 @@ public class PlanParserTests
         Assert.Equal("[_WA_Sys_00000002_Users]", stat.Name);
         Assert.True(stat.AutoCreated);
         Assert.Equal(4.51, stat.SamplingPct, 2);
-    }
-
-    [Fact]
-    public void ParseStatistics_Minimal_Returns_Empty()
-    {
-        var result = ParseInline(MinimalPlanXml);
-
-        Assert.Empty(result.Statistics);
     }
 
     // --- Helpers ---
