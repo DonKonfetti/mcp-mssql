@@ -16,4 +16,13 @@ public sealed class Profile
     /// Optional human- or agent-facing description.
     /// </summary>
     public string? Description { get; init; }
+
+    /// <summary>
+    /// Whether this profile permits write commands (DDL/DML) via run_command.
+    /// </summary>
+    /// <remarks>
+    /// The write tool is only advertised when some profile sets this, so this
+    /// flag is how an agent finds a writable profile in a multi-profile setup.
+    /// </remarks>
+    public bool AllowWrite { get; init; }
 }

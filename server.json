@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.alyiox/mcp-mssql",
   "title": "Microsoft SQL Server",
-  "description": "Read-only-by-default SQL Server: execution plans, parameterized SELECT, metadata, opt-in writes.",
+  "description": "Read-only-by-default SQL Server: schema, parameterized SELECT, execution plans; writes opt-in.",
   "websiteUrl": "https://github.com/alyiox/mcp-mssql",
   "repository": {
     "url": "https://github.com/alyiox/mcp-mssql",
@@ -72,7 +72,7 @@
         },
         {
           "name": "MCPMSSQL_ALLOW_WRITE",
-          "description": "Enable write commands (DDL/DML) via run_command on the default profile (default false). Soft guard only — prefer a db_datareader login for a hard read-only guarantee.",
+          "description": "Enable write commands (DDL/DML) via run_command on the default profile (default false). With no write-enabled profile the tool is not advertised at all. Soft guard only — prefer a db_datareader login for a hard read-only guarantee.",
           "isRequired": false,
           "format": "boolean",
           "isSecret": false

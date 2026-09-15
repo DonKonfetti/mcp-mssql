@@ -124,6 +124,25 @@ public class ProfileServiceTests
     }
 
     [Fact]
+    public void GetProfiles_Reports_AllowWrite_Per_Profile()
+    {
+        var options = new McpMssqlOptions
+        {
+            Profiles = new Dictionary<string, McpMssqlProfileOptions>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["default"] = new McpMssqlProfileOptions(),
+                ["writer"] = new McpMssqlProfileOptions { AllowWrite = true },
+            },
+        };
+        var profileService = new ProfileService(Options.Create(options));
+
+        var profiles = profileService.GetProfiles();
+
+        Assert.False(profiles.Single(p => p.Name == "default").AllowWrite);
+        Assert.True(profiles.Single(p => p.Name == "writer").AllowWrite);
+    }
+
+    [Fact]
     public void GetProfiles_Returns_Null_Description_When_Profile_Description_Is_Null_Or_Whitespace()
     {
         var options = new McpMssqlOptions

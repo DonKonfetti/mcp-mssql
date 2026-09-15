@@ -15,9 +15,16 @@ namespace Alyio.McpMssql.Features;
 public static class WriteTools
 {
     /// <summary>
+    /// The advertised name of the write tool. Pinned here rather than derived
+    /// from the method name so renaming the method cannot silently change the
+    /// wire contract or the name the registration gate looks up.
+    /// </summary>
+    internal const string ToolName = "run_command";
+
+    /// <summary>
     /// Execute an arbitrary write T-SQL command (DDL/DML).
     /// </summary>
-    [McpServerTool(UseStructuredContent = true, Destructive = true, ReadOnly = false, Idempotent = false, OpenWorld = false)]
+    [McpServerTool(Name = ToolName, UseStructuredContent = true, Destructive = true, ReadOnly = false, Idempotent = false, OpenWorld = false)]
     [Description(
         "[MSSQL] Execute write T-SQL (DDL/DML). " +
         "Requires a write-enabled profile; rejected on read-only profiles (the default). " +

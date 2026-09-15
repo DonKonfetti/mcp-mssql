@@ -32,6 +32,7 @@ internal sealed class ProfileService(IOptions<McpMssqlOptions> options) : IProfi
             {
                 Name = p.Key,
                 Description = string.IsNullOrWhiteSpace(p.Value.Description) ? null : p.Value.Description.Trim(),
+                AllowWrite = p.Value.AllowWrite,
             })
             .ToList();
     }

@@ -6,9 +6,9 @@
 [![NuGet Version](https://img.shields.io/nuget/v/Alyio.McpMssql.svg)](https://www.nuget.org/packages/Alyio.McpMssql)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized SELECT queries, it exposes **execution-plan analysis**: `analyze_query` returns cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves multiple connections from a single server.
+A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized SELECT queries, it exposes **execution-plan analysis** for cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
 
-The query tools enforce SELECT-only (no DML/DDL); an optional `run_command` tool can execute arbitrary write T-SQL, but only on profiles that explicitly opt in via `AllowWrite` (locked off by default).
+The query tools, `run_query` and `analyze_query`, are SELECT-only (no DML/DDL). The write tool, `run_command`, is registered only when a profile opts in via `AllowWrite` (off by default), so a stock deployment never advertises it at all; once some profile opts in, it still rejects locked profiles at call time.
 
 **Requirements:** .NET 8.0 or later runtime (the tool targets `net8.0` and `net10.0`), SQL Server, and a connection string. Building from source requires the .NET 10.0 SDK.
 
@@ -35,8 +35,6 @@ export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStr
 npx -y @modelcontextprotocol/inspector@latest dotnet run --project src/Alyio.McpMssql -f net10.0
 ```
 
-Use `--prerelease` for pre-release builds.
-
 ## Configuration
 
 All settings use the **MCPMSSQL** prefix. **Flat** environment variables (e.g. `MCPMSSQL_CONNECTION_STRING`) are the straightforward way to configure the **default** profile when you have a single connection. For multiple profiles, the user-scoped `appsettings.json` file is recommended.
@@ -53,19 +51,20 @@ export MCPMSSQL_DESCRIPTION="Primary connection"
 # Optional max rows per interactive query (default `500`; hard ceiling `1000`).
 export MCPMSSQL_QUERY_MAX_ROWS="500"
 
-# Optional query timeout in seconds (default `30`).
+# Optional query timeout in seconds (default `30`; hard ceiling `300`).
 export MCPMSSQL_QUERY_COMMAND_TIMEOUT_SECONDS="60"
 
 # Optional max rows for snapshot queries (default `10000`; hard ceiling `50000`).
 export MCPMSSQL_QUERY_SNAPSHOT_MAX_ROWS="10000"
 
-# Optional snapshot query timeout in seconds (default `120`).
+# Optional snapshot query timeout in seconds (default `120`; hard ceiling `300`).
 export MCPMSSQL_QUERY_SNAPSHOT_COMMAND_TIMEOUT_SECONDS="120"
 
 # Optional analyze timeout in seconds (default `300`; hard ceiling `600`).
 export MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS="300"
 
 # Optional: enable write commands (DDL/DML) via run_command (default `false`).
+# Also controls discovery — with no write-enabled profile, run_command is not advertised.
 # Soft guard only — prefer a db_datareader login for a hard read-only guarantee.
 export MCPMSSQL_ALLOW_WRITE="false"
 
@@ -133,11 +132,11 @@ All tools accept an optional `profile`; when omitted, the default profile is use
 
 | Tool | Description | Key params |
 |---|---|---|
-| **`list_profiles`** | List configured connection profiles. Call first when picking a non-default profile. | — |
+| **`list_profiles`** | List configured connection profiles. Call first when picking a non-default profile. Returns `name`, `description` and `allow_write` per profile. | — |
 | **`get_object`** | Get metadata for one relation (columns, indexes, constraints, relationships) or routine (definition). `name` accepts `Users`, `dbo.Users` or `[dbo].[Users]`. `includes` omitted → `columns`. Relations also carry an approximate `row_count`. | `kind`, `name`, `profile`, `catalog`, `schema`, `includes` |
 | **`run_query`** | Execute read-only T-SQL SELECT; only SELECT allowed (no DML/DDL). Returns results as CSV in the `data` field (inline) or a snapshot resource URI when `snapshot=true`. Inline limit: 500 rows (hard ceiling 1000). Snapshot limit: 10 000 rows (hard ceiling 50 000). Prefer `analyze_query` for plan tuning. | `sql`, `profile`, `catalog`, `parameters`, `snapshot` |
 | **`analyze_query`** | Analyze execution plan for a read-only SELECT. Returns compact JSON summary (cost, operators, cardinality, warnings, `missing_indexes`, waits, stats); no result rows, full XML at `plan_uri`. | `sql`, `profile`, `catalog`, `parameters`, `estimated` |
-| **`run_command`** | Execute write T-SQL (DDL/DML). Rejected unless the target `profile` sets `AllowWrite=true` (off by default). Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
+| **`run_command`** | Execute write T-SQL (DDL/DML). Advertised only when some profile sets `AllowWrite=true` (off by default); still rejected at call time when the target `profile` is locked. Caller manages transactions. Returns `rows_affected` (−1 for DDL) and server `messages`. Marked destructive; intended for human-supervised use. | `sql`, `profile`, `catalog`, `parameters` |
 
 - **`kind`** — `relation` or `routine`.
 - **`includes`** — Array of detail sections: `columns`, `indexes`, `constraints`, `relationships` (relations only), `definition` (routines only). `relationships` returns foreign keys in both directions.
@@ -148,9 +147,11 @@ Catalog browsing is left to `run_query` over `sys.objects`, `sys.schemas` and `s
 
 | URI template | Description |
 |---|---|
-| `mssql://profiles` | List configured connection profiles. Same data as `list_profiles`. |
+| `mssql://profiles` | List configured connection profiles, including `allow_write`. Same data as `list_profiles`. |
 | `mssql://plans/{id}` | Retrieve full XML execution plan by ID from `analyze_query`; entries expire after 7 days. |
-| `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 1 day. |
+| `mssql://snapshots/{id}` | Retrieve full query result as CSV by ID from `run_query` (snapshot=true); entries expire after 7 days. |
+
+Plans and snapshots are written to disk, under `~/.cache/mcp-mssql/plans/` and `~/.cache/mcp-mssql/snapshots/` (`%USERPROFILE%\.cache\mcp-mssql\` on Windows). Expired files are swept the first time the server touches the store.
 
 ## Security
 
@@ -170,31 +171,15 @@ Hints that acquire no extra locks, such as `NOLOCK`, `ROWLOCK` and `READPAST`, s
 
 Like `AllowWrite` below, this constrains what this server will send — it is not a database permission.
 
-**Writes are opt-in.** The `run_command` tool executes arbitrary T-SQL. It is rejected unless the target profile sets `AllowWrite=true`, which defaults to `false`, so existing deployments stay read-only with no change. The tool is always advertised and rejects at call time on locked profiles.
+**Writes are opt-in, and invisible until then.** The `run_command` tool executes arbitrary T-SQL. Unless at least one configured profile sets `AllowWrite=true` (default `false`), the tool is not registered at all — it never appears in `tools/list`, so a read-only deployment spends no context on it and offers no write surface for an agent to be talked into. Once any profile opts in, the tool is advertised server-wide and still rejects at call time on profiles that remain locked; `list_profiles` reports `allow_write` per profile so an agent can pick a writable one.
 
 `AllowWrite` is a soft, application-level guard, **not** a security boundary — it constrains this server, not the database. For a genuine read-only guarantee, connect with a login restricted to `db_datareader`, and keep write-enabled profiles pointed at credentials scoped to only what they need. `run_command` is marked `destructive` via MCP tool annotations so hosts can gate it behind confirmation, but honor those annotations at the host's discretion.
 
 ## MCP host examples
 
-Snippets for common MCP clients. Replace the connection string with your own; ensure `dotnet` is on your PATH. The `env` block is not required if the connection string is already set via `appsettings.json` or environment variables.
+Replace the connection string with your own; ensure `dotnet` is on your PATH. The `env` block is unnecessary when the connection string already comes from `appsettings.json` or the environment.
 
-### Cursor
-
-```json
-{
-  "mcpServers": {
-    "mssql": {
-      "command": "dotnet",
-      "args": ["dnx", "Alyio.McpMssql", "--prerelease", "--yes"],
-      "env": {
-        "MCPMSSQL_CONNECTION_STRING": "Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
-      }
-    }
-  }
-}
-```
-
-### Gemini
+**Claude Code, Cursor and Gemini** all read the same `mcpServers` shape:
 
 ```json
 {
@@ -210,7 +195,10 @@ Snippets for common MCP clients. Replace the connection string with your own; en
 }
 ```
 
-### Codex
+<details>
+<summary>Codex, Open Code and GitHub Copilot</summary>
+
+Codex (TOML):
 
 ```toml
 [mcp_servers.mssql]
@@ -220,7 +208,7 @@ args = ["dnx", "Alyio.McpMssql", "--prerelease", "--yes"]
 MCPMSSQL_CONNECTION_STRING = "Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
 ```
 
-### Open Code
+Open Code:
 
 ```json
 {
@@ -238,23 +226,7 @@ MCPMSSQL_CONNECTION_STRING = "Server=127.0.0.1;User ID=sa;Password=<YourStrong@P
 }
 ```
 
-### Claude Code
-
-```json
-{
-  "mcpServers": {
-    "mssql": {
-      "command": "dotnet",
-      "args": ["dnx", "Alyio.McpMssql", "--prerelease", "--yes"],
-      "env": {
-        "MCPMSSQL_CONNECTION_STRING": "Server=127.0.0.1;User ID=sa;Password=<YourStrong@Passw0rd>;Encrypt=True;TrustServerCertificate=True;"
-      }
-    }
-  }
-}
-```
-
-### GitHub Copilot
+GitHub Copilot:
 
 ```json
 {
@@ -272,6 +244,7 @@ MCPMSSQL_CONNECTION_STRING = "Server=127.0.0.1;User ID=sa;Password=<YourStrong@P
 }
 ```
 
+</details>
 
 ## Integration tests
 
@@ -314,4 +287,4 @@ Open issues or PRs; follow existing style and add tests where appropriate.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)
