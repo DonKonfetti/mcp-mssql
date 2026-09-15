@@ -50,13 +50,7 @@ public static partial class McpMssqlOptionsExtensions
 
     private static void EnsureProfilesExist(McpMssqlOptions options)
     {
-        if (options.Profiles.Count == 0)
-        {
-            options.Profiles[McpMssqlOptions.DefaultProfileName] = new McpMssqlProfileOptions();
-            return;
-        }
-
-        if (!options.Profiles.TryGetValue(McpMssqlOptions.DefaultProfileName, out _))
+        if (!options.Profiles.ContainsKey(McpMssqlOptions.DefaultProfileName))
         {
             options.Profiles[McpMssqlOptions.DefaultProfileName] = new McpMssqlProfileOptions();
         }
@@ -64,27 +58,17 @@ public static partial class McpMssqlOptionsExtensions
 
     private static void ValidateAndNormalize(McpMssqlOptions options, ILogger logger)
     {
-        if (!options.Profiles.TryGetValue(McpMssqlOptions.DefaultProfileName, out _))
-        {
-            throw new InvalidOperationException(
-                $"Default MCP MSSQL profile '{McpMssqlOptions.DefaultProfileName}' was not found. " +
-                $"Available profiles: {string.Join(", ", options.Profiles.Keys)}");
-        }
-
-        foreach ((string? name, McpMssqlProfileOptions profile) in options.Profiles)
+        foreach ((string name, McpMssqlProfileOptions profile) in options.Profiles)
         {
             if (string.IsNullOrWhiteSpace(profile.ConnectionString))
             {
                 throw new InvalidOperationException(
-                    $"ConnectionString is required for MCP MSSQL profile '{name ?? "<unnamed>"}'.");
-
+                    $"ConnectionString is required for MCP MSSQL profile '{name}'.");
             }
 
-            var profileName = name ?? "<unnamed>";
-
-            ClampQueryOptions(profile.Query, logger, profileName);
-            ClampAnalyzeOptions(profile.Analyze, logger, profileName);
-            ClampWriteOptions(profile.Write, logger, profileName);
+            ClampQueryOptions(profile.Query, logger, name);
+            ClampAnalyzeOptions(profile.Analyze, logger, name);
+            ClampWriteOptions(profile.Write, logger, name);
         }
     }
 

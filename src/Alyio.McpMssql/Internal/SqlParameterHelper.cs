@@ -37,7 +37,7 @@ internal static class SqlParameterHelper
     /// Normalizes JSON-native and CLR values into SQL-provider-compatible
     /// parameter values.
     /// </summary>
-    public static object Normalize(object? value)
+    private static object Normalize(object? value)
     {
         if (value is null)
         {

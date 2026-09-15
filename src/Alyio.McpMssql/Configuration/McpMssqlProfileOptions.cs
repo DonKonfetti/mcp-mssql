@@ -52,9 +52,4 @@ public sealed class McpMssqlProfileOptions
     /// Only applies when <see cref="AllowWrite"/> is <c>true</c>.
     /// </summary>
     public WriteOptions Write { get; set; } = new();
-
-    /// <summary>
-    /// The well-known name of the default MCP MSSQL profile.
-    /// </summary>
-    internal const string DefaultProfileName = "default";
 }

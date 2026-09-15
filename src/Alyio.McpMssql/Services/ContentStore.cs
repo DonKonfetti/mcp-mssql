@@ -165,7 +165,7 @@ internal abstract partial class ContentStore : IContentStore
         var now = DateTime.UtcNow;
         foreach (var file in files)
         {
-            if (!TryGetExpiryUtc(file, out _, now))
+            if (!IsFresh(file, now))
             {
                 TryDeleteFile(file);
                 continue;
@@ -196,9 +196,8 @@ internal abstract partial class ContentStore : IContentStore
         return memoryStore;
     }
 
-    private bool TryGetExpiryUtc(string path, out DateTime expiryUtc, DateTime now)
+    private bool IsFresh(string path, DateTime now)
     {
-        expiryUtc = default;
         try
         {
             var lastWriteUtc = File.GetLastWriteTimeUtc(path);
@@ -207,8 +206,7 @@ internal abstract partial class ContentStore : IContentStore
                 return false;
             }
 
-            expiryUtc = lastWriteUtc + _ttl;
-            return expiryUtc > now;
+            return lastWriteUtc + _ttl > now;
         }
         catch (IOException ex)
         {
