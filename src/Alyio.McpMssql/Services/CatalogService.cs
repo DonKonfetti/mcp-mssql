@@ -202,18 +202,10 @@ internal sealed class CatalogService(IProfileService profileService) : ICatalogS
             new SqlParameter("@schema", schema ?? (object)DBNull.Value)
         };
 
-        TabularResult result;
-        try
-        {
-            result = await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (SqlException ex) when (ex.Number is 229 or 297 or 300)
-        {
-            // No VIEW DATABASE STATE. The row count is supplementary, so degrade
-            // to null rather than failing the whole describe.
-            return null;
-        }
+        // A caller that cannot see the table gets no row from sys.partitions
+        // rather than a permission error, so the null degrades on its own.
+        var result = await conn.ExecuteAsTabularResultAsync(sql, parameters, cancellationToken)
+            .ConfigureAwait(false);
 
         if (result.Rows.Count == 0)
         {
