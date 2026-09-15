@@ -7,7 +7,7 @@
     <PackageType>McpServer</PackageType>
     <ToolCommandName>mcp-mssql</ToolCommandName>
     <Description>Read-only-by-default Model Context Protocol (MCP) server for Microsoft SQL Server and Azure SQL: schema discovery, parameterized SELECT-only queries, execution-plan analysis, writes opt-in, multi-connection profiles.</Description>
-    <Version>1.6.0</Version>
+    <Version>1.6.1</Version>
     <UserSecretsId>3852cfb6-6088-4198-9394-a7c0cb1f19a0</UserSecretsId>
     <Authors>Jon X</Authors>
     <Company>Jon X</Company>
