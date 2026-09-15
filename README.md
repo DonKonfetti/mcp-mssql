@@ -6,7 +6,7 @@
 [![NuGet Version](https://img.shields.io/nuget/v/Alyio.McpMssql.svg)](https://www.nuget.org/packages/Alyio.McpMssql)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized SELECT queries, it exposes **execution-plan analysis** for cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
+A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized **SELECT queries**, it exposes **execution-plan analysis** for cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
 
 The query tools, `run_query` and `analyze_query`, are SELECT-only (no DML/DDL). The write tool, `run_command`, is registered only when a profile opts in via `AllowWrite` (off by default), so a stock deployment never advertises it at all; once some profile opts in, it still rejects locked profiles at call time.
 
