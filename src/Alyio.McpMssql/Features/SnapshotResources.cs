@@ -21,7 +21,7 @@ public static class SnapshotResources
         MimeType = "text/csv")]
     [Description(
         "[MSSQL] Retrieve full query result snapshot as CSV by ID. " +
-        "Use the id from run_query (snapshot_uri); entries expire after 1 day and may return not found.")]
+        "Use the id from run_query (snapshot_uri); entries expire and may return not found.")]
     public static async Task<string> GetSnapshotAsync(
         ISnapshotStore snapshotStore,
         [Description("Opaque id from run_query (snapshot_uri path segment). Src: run_query.")]
