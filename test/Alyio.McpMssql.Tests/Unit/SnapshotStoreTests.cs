@@ -57,7 +57,7 @@ public class SnapshotStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Returns_Null_For_Unknown_Id()
     {
-        var result = await _store.TryGetAsync("nonexistent", CancellationToken);
+        var result = await _store.TryGetAsync(Guid.NewGuid().ToString("N"), CancellationToken);
 
         Assert.Null(result);
     }
@@ -88,7 +88,7 @@ public class SnapshotStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Loads_Existing_Snapshot_Into_Memory()
     {
-        const string id = "deadbeef";
+        var id = Guid.NewGuid().ToString("N");
         var snapshotPath = Path.Combine(_snapshotsDirectory, $"{id}{SnapshotFileExtension}");
         Directory.CreateDirectory(_snapshotsDirectory);
         await File.WriteAllTextAsync(snapshotPath, SampleCsv, CancellationToken);
@@ -106,7 +106,7 @@ public class SnapshotStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Evicts_Expired_Existing_File_On_First_Load()
     {
-        const string id = "cafebabe";
+        var id = Guid.NewGuid().ToString("N");
         var snapshotPath = Path.Combine(_snapshotsDirectory, $"{id}{SnapshotFileExtension}");
         Directory.CreateDirectory(_snapshotsDirectory);
         await File.WriteAllTextAsync(snapshotPath, SampleCsv, CancellationToken);

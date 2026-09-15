@@ -68,7 +68,7 @@ internal abstract partial class ContentStore : IContentStore
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var id = Guid.NewGuid().ToString("N")[..8];
+            var id = Guid.NewGuid().ToString("N");
             var finalPath = GetFilePath(id);
             var tempPath = Path.Combine(_directory, $".{id}.{Guid.NewGuid():N}.tmp");
 
@@ -103,7 +103,8 @@ internal abstract partial class ContentStore : IContentStore
 
     public async Task<string?> TryGetAsync(string id, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        // The caller supplies this id, and only a GUID can name a stored entry.
+        if (!Guid.TryParse(id, out _))
         {
             return null;
         }
@@ -251,7 +252,11 @@ internal abstract partial class ContentStore : IContentStore
             return null;
         }
 
-        return name[..^_fileExtension.Length];
+        var id = name[..^_fileExtension.Length];
+
+        // Only this store writes here, so a name that is not a GUID is a stray
+        // file; the caller deletes it.
+        return Guid.TryParse(id, out _) ? id : null;
     }
 
     private static string GetDefaultDirectory(string cacheRelativePath)

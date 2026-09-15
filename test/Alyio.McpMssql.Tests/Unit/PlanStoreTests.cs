@@ -57,9 +57,38 @@ public class PlanStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Returns_Null_For_Unknown_Id()
     {
-        var result = await _store.TryGetAsync("nonexistent", CancellationToken);
+        var result = await _store.TryGetAsync(Guid.NewGuid().ToString("N"), CancellationToken);
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Save_Produces_Guid_Ids()
+    {
+        var id = await _store.SaveAsync(SampleXml, CancellationToken);
+
+        Assert.True(Guid.TryParseExact(id, "N", out _), $"Expected a GUID id, got '{id}'.");
+    }
+
+    [Fact]
+    public async Task TryGet_Rejects_Id_That_Escapes_The_Store_Directory()
+    {
+        // Without the GUID guard this id resolves through Path.Combine and
+        // reads a file the store never wrote.
+        Directory.CreateDirectory(_plansDirectory);
+        var outsidePath = Path.Combine(_plansDirectory, $"..{Path.DirectorySeparatorChar}escape{PlanFileExtension}");
+        await File.WriteAllTextAsync(outsidePath, SampleXml, CancellationToken);
+
+        try
+        {
+            var result = await _store.TryGetAsync("../escape", CancellationToken);
+
+            Assert.Null(result);
+        }
+        finally
+        {
+            File.Delete(outsidePath);
+        }
     }
 
     [Fact]
@@ -88,7 +117,7 @@ public class PlanStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Loads_Existing_Plan_Into_Memory()
     {
-        const string id = "deadbeef";
+        var id = Guid.NewGuid().ToString("N");
         var planPath = Path.Combine(_plansDirectory, $"{id}{PlanFileExtension}");
         Directory.CreateDirectory(_plansDirectory);
         await File.WriteAllTextAsync(planPath, SampleXml, CancellationToken);
@@ -106,7 +135,7 @@ public class PlanStoreTests : IDisposable
     [Fact]
     public async Task TryGet_Evicts_Expired_Existing_File_On_First_Load()
     {
-        const string id = "cafebabe";
+        var id = Guid.NewGuid().ToString("N");
         var planPath = Path.Combine(_plansDirectory, $"{id}{PlanFileExtension}");
         Directory.CreateDirectory(_plansDirectory);
         await File.WriteAllTextAsync(planPath, SampleXml, CancellationToken);
