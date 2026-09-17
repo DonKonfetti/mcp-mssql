@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -12,6 +14,7 @@ public sealed class CommandResult
     /// Number of rows affected by the command, as reported by the provider.
     /// DDL statements and batches that report no row count return <c>-1</c>.
     /// </summary>
+    [Description("Rows affected; -1 for DDL and batches that report no count.")]
     public required int RowsAffected { get; init; }
 
     /// <summary>

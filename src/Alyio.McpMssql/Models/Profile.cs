@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -24,5 +26,6 @@ public sealed class Profile
     /// The write tool is only advertised when some profile sets this, so this
     /// flag is how an agent finds a writable profile in a multi-profile setup.
     /// </remarks>
+    [Description("Whether run_command is permitted on this profile.")]
     public bool AllowWrite { get; init; }
 }

@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -15,6 +17,7 @@ public sealed class AnalyzeResult
     /// (e.g. <c>mssql://plans/{id}</c>). Fetch this resource
     /// when the summary alone is insufficient for deep analysis.
     /// </summary>
+    [Description("Resource URI for the full XML plan (mssql://plans/{id}).")]
     public required string PlanUri { get; init; }
 
     /// <summary>
@@ -33,6 +36,7 @@ public sealed class AnalyzeResult
     /// Operators where estimated vs. actual row counts diverged
     /// by more than 10x. Empty when no significant mismatches exist.
     /// </summary>
+    [Description("Only divergences beyond 10x. Empty means none passed that threshold.")]
     public required IReadOnlyList<CardinalityIssue> CardinalityIssues { get; init; }
 
     /// <summary>
@@ -52,11 +56,13 @@ public sealed class AnalyzeResult
     /// to the most significant wait types. Shows where the query
     /// spent time waiting rather than executing.
     /// </summary>
+    [Description("Most significant types only; empty on SQL Server before 2016.")]
     public required IReadOnlyList<WaitStat> WaitStats { get; init; }
 
     /// <summary>
     /// Statistics objects the optimizer relied on, filtered to
     /// those that may be problematic (low sampling or stale).
     /// </summary>
+    [Description("Only low-sampling or stale ones. Empty does not mean none were used.")]
     public required IReadOnlyList<StatisticsInfo> Statistics { get; init; }
 }

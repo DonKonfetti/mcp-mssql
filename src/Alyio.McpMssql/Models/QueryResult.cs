@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -11,6 +13,7 @@ public sealed class QueryResult
     /// CSV-formatted result data (header row + data rows) for inline delivery.
     /// Null in snapshot mode — use <see cref="SnapshotUri"/> to fetch the data.
     /// </summary>
+    [Description("CSV; header row first. Null in snapshot mode — fetch snapshot_uri instead.")]
     public string? Data { get; init; }
 
     /// <summary>
@@ -32,5 +35,6 @@ public sealed class QueryResult
     /// Resource URI for the full CSV snapshot.
     /// Set only in snapshot mode; omitted for inline results.
     /// </summary>
+    [Description("Resource URI for the full CSV (mssql://snapshots/{id}). Set only in snapshot mode.")]
     public string? SnapshotUri { get; init; }
 }

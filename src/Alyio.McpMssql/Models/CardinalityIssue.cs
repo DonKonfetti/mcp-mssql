@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -38,5 +40,6 @@ public sealed class CardinalityIssue
     /// <c>&lt;1</c> = overestimate. Values beyond 10x or below
     /// 0.1x indicate a significant estimation problem.
     /// </summary>
+    [Description("ActualRows / EstimatedRows. >1 underestimate, <1 overestimate.")]
     public double Ratio { get; init; }
 }

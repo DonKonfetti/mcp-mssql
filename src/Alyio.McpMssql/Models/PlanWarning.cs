@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -17,6 +19,7 @@ public sealed class PlanWarning
     /// <c>MemoryGrantExcessive</c>, <c>MemoryGrantIncrease</c>,
     /// <c>UnmatchedIndexes</c>.
     /// </summary>
+    [Description("SpillToTempDb | NoJoinPredicate | ColumnsWithNoStatistics | ImplicitConversion | MemoryGrantExcessive | MemoryGrantIncrease | UnmatchedIndexes.")]
     public required string Kind { get; init; }
 
     /// <summary>

@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -18,6 +20,7 @@ public sealed class MissingIndex
     /// Columns used in equality predicates (<c>=</c>).
     /// These become the leading key columns of the suggested index.
     /// </summary>
+    [Description("Leading key columns of the suggested index.")]
     public required IReadOnlyList<string> EqualityColumns { get; init; }
 
     /// <summary>
@@ -25,12 +28,14 @@ public sealed class MissingIndex
     /// <c>BETWEEN</c>, etc.). These follow the equality columns
     /// in the index key.
     /// </summary>
+    [Description("Key columns following the equality columns.")]
     public required IReadOnlyList<string> InequalityColumns { get; init; }
 
     /// <summary>
     /// Columns needed for covering (selected but not filtered on).
     /// These become <c>INCLUDE</c> columns in the index definition.
     /// </summary>
+    [Description("INCLUDE columns of the suggested index.")]
     public required IReadOnlyList<string> IncludeColumns { get; init; }
 
     /// <summary>

@@ -1,5 +1,7 @@
 // MIT License
 
+using System.ComponentModel;
+
 namespace Alyio.McpMssql.Models;
 
 /// <summary>
@@ -44,6 +46,7 @@ public sealed class PlanOperator
     /// Actual output rows at runtime. <c>null</c> for estimated-only
     /// plans. Summed across threads for parallel operators.
     /// </summary>
+    [Description("Null for estimated-only plans; summed across threads when parallel.")]
     public long? ActualRows { get; init; }
 
     /// <summary>
