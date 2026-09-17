@@ -17,8 +17,7 @@ public static class ServerTools
     /// </summary>
     [McpServerTool(UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
     [Description(
-        "[MSSQL] List configured connection profiles. " +
-        "Call before other tools when you must pick a non-default profile.")]
+        "[MSSQL] List configured connection profiles.")]
     public static IReadOnlyList<Profile> ListProfiles(
         IProfileService profileService)
     {

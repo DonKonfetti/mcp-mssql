@@ -19,14 +19,11 @@ public static class QueryTools
     /// </summary>
     [McpServerTool(UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
     [Description(
-        "[MSSQL] Execute Read-only T-SQL SELECT and return tabular results. " +
-        "Results are bounded by server-enforced limits; only SELECT is allowed (no DML/DDL). " +
-        "Use TOP or OFFSET-FETCH for pagination. " +
-        "Use snapshot=true for large/reporting queries — returns a resource URI instead of inline rows. " +
+        "[MSSQL] Execute read-only T-SQL SELECT. " +
         "Prefer analyze_query when tuning plans.")]
     public static Task<QueryResult> RunQueryAsync(
         IQueryService queryService,
-        [Description("Read-only T-SQL SELECT. Bind @paramName placeholders; for IN lists use numbered names (e.g. @id_0, @id_1).")]
+        [Description("Read-only T-SQL SELECT. Bind @paramName placeholders; for IN lists use numbered names (e.g. @id_0, @id_1). Page with TOP or OFFSET-FETCH.")]
         string sql,
         [Description("If omitted or empty, uses the default profile. Src: profiles.")]
         string? profile = null,
@@ -35,9 +32,8 @@ public static class QueryTools
         [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
         [Description(
-            "When true, persists the full result as a CSV snapshot resource and returns its URI " +
-            "instead of inline data. Use for large or reporting queries to avoid flooding the " +
-            "context window. Default false.")]
+            "Persist the full result as a CSV snapshot resource and return its URI instead of " +
+            "inline rows. Use when the result may be large.")]
         bool snapshot = false,
         CancellationToken cancellationToken = default)
     {
@@ -51,9 +47,7 @@ public static class QueryTools
     /// </summary>
     [McpServerTool(UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
     [Description(
-        "[MSSQL] Analyze execution plan for a read-only SELECT. " +
-        "Returns a compact JSON summary (cost, operators, cardinality, warnings, missing_indexes, waits, stats); " +
-        "no result rows, full XML at plan_uri.")]
+        "[MSSQL] Analyze execution plan for a read-only SELECT.")]
     public static Task<AnalyzeResult> AnalyzeQueryAsync(
         IQueryService queryService,
         [Description("Read-only T-SQL SELECT to analyze; only SELECT is allowed.")]
@@ -64,7 +58,7 @@ public static class QueryTools
         string? catalog = null,
         [Description("Values for SQL parameters; keys are names without '@' (e.g. id → @id).")]
         IReadOnlyDictionary<string, object>? parameters = null,
-        [Description("When true, returns estimated plan without executing. Default false: actual plan with runtime stats.")]
+        [Description("Return the estimated plan without executing; default is the actual plan with runtime stats.")]
         bool estimated = false,
         CancellationToken cancellationToken = default)
     {

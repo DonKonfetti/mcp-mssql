@@ -21,7 +21,7 @@ public static class PlanResources
         MimeType = "application/xml")]
     [Description(
         "[MSSQL] Retrieve full XML execution plan by ID. " +
-        "Use the id from analyze_query (plan_uri); entries expire and may return not found.")]
+        "Entries expire. Src: analyze_query.")]
     public static async Task<string> GetPlanAsync(
         IPlanStore planStore,
         [Description("Opaque id from analyze_query (plan_uri path segment). Src: analyze_query.")]

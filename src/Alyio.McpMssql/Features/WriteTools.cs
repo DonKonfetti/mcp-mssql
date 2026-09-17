@@ -30,7 +30,7 @@ public static class WriteTools
         "Requires a write-enabled profile; rejected on read-only profiles (the default). " +
         "Runs arbitrary statements/batches; intended for human-supervised use. " +
         "Caller manages transactions (BEGIN/COMMIT/ROLLBACK). " +
-        "Returns rows affected (-1 for DDL) and any server messages. " +
+        "Returns rows affected, -1 for DDL. " +
         "For reads use run_query.")]
     public static Task<CommandResult> RunCommandAsync(
         ICommandService commandService,

@@ -20,8 +20,7 @@ public static class ServerResources
         UriTemplate = "mssql://profiles",
         MimeType = "application/json")]
     [Description(
-        "[MSSQL] List configured connection profiles. " +
-        "Same data as list_profiles; use when the client prefers resources over tools.")]
+        "[MSSQL] List configured connection profiles.")]
     public static async Task<string> ListProfilesAsync(
         IProfileService profileService,
         CancellationToken cancellationToken = default)

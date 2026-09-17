@@ -21,8 +21,7 @@ public static class ObjectTools
     /// </summary>
     [McpServerTool(UseStructuredContent = true, ReadOnly = true, OpenWorld = false)]
     [Description(
-        "[MSSQL] Get metadata for one relation (columns, indexes, constraints, relationships) " +
-        "or routine (definition).")]
+        "[MSSQL] Get metadata for one relation or routine.")]
     public static async Task<ObjectResult> GetObjectAsync(
         ICatalogService catalogService,
         [Description("relation | routine.")]
