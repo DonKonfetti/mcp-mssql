@@ -6,9 +6,7 @@
 [![NuGet Version](https://img.shields.io/nuget/v/Alyio.McpMssql.svg)](https://www.nuget.org/packages/Alyio.McpMssql)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server. Beyond schema discovery and parameterized **SELECT queries**, it exposes **execution-plan analysis** for cost, operators, cardinality estimates, warnings, and index suggestions, so an agent can work out *why* a query is slow instead of only running it. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
-
-The query tools, `run_query` and `analyze_query`, are SELECT-only (no DML/DDL). The write tool, `run_command`, is registered only when a profile opts in via `AllowWrite` (off by default), so a stock deployment never advertises it at all; once some profile opts in, it still rejects locked profiles at call time.
+A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server with schema discovery, parameterized SELECT **queries**, execution-plan **analysis**, and **opt-in writes** per profile. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
 
 **Requirements:** .NET 8.0 or later runtime (the tool targets `net8.0` and `net10.0`), SQL Server, and a connection string. Building from source requires the .NET 10.0 SDK.
 
@@ -37,9 +35,33 @@ npx -y @modelcontextprotocol/inspector@latest dotnet run --project src/Alyio.Mcp
 
 ## Configuration
 
-All settings use the **MCPMSSQL** prefix. **Flat** environment variables (e.g. `MCPMSSQL_CONNECTION_STRING`) are the straightforward way to configure the **default** profile when you have a single connection. For multiple profiles, the user-scoped `appsettings.json` file is recommended.
+A **profile** is one SQL Server connection: a connection string, the row and timeout caps that apply to it, and whether writes are allowed. A profile named `default` always exists; every tool takes an optional `profile` to reach another, and `list_profiles` reports what is configured.
 
-**Single connection:** Configure via environment variables.
+Settings come from three sources, merged field by field, later winning:
+
+1. the user-scoped `appsettings.json` — any number of profiles;
+2. `McpMssql__Profiles__<NAME>__<FIELD>` environment variables — any number of profiles;
+3. flat `MCPMSSQL_<FIELD>` environment variables — the `default` profile only.
+
+Because the merge is per field rather than per profile, an `appsettings.json` can carry the full set while a flat `MCPMSSQL_CONNECTION_STRING` repoints the default profile at a local server, leaving its other fields intact. There is no fallback connection string: a profile without one — including a `default` that nothing configured — fails startup.
+
+Each setting has one field name, spelled three ways — the JSON path under `McpMssql:Profiles:<NAME>`, that same path with `:` replaced by `__` as an environment variable, or the flat form:
+
+| Field | Flat variable | Default | Hard ceiling |
+|---|---|---|---|
+| `ConnectionString` | `MCPMSSQL_CONNECTION_STRING` | required | — |
+| `Description` | `MCPMSSQL_DESCRIPTION` | none | — |
+| `AllowWrite` | `MCPMSSQL_ALLOW_WRITE` | `false` | — |
+| `Query:MaxRows` | `MCPMSSQL_QUERY_MAX_ROWS` | 500 | 1 000 |
+| `Query:CommandTimeoutSeconds` | `MCPMSSQL_QUERY_COMMAND_TIMEOUT_SECONDS` | 30 | 300 |
+| `Query:SnapshotMaxRows` | `MCPMSSQL_QUERY_SNAPSHOT_MAX_ROWS` | 10 000 | 50 000 |
+| `Query:SnapshotCommandTimeoutSeconds` | `MCPMSSQL_QUERY_SNAPSHOT_COMMAND_TIMEOUT_SECONDS` | 120 | 300 |
+| `Analyze:CommandTimeoutSeconds` | `MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS` | 300 | 600 |
+| `Write:CommandTimeoutSeconds` | `MCPMSSQL_WRITE_COMMAND_TIMEOUT_SECONDS` | 60 | 600 |
+
+Caps are per profile. A value above its ceiling — or below 1 — is clamped at startup and the adjustment is logged as a warning on stderr; a flat value that is not an integer, or not a boolean for `AllowWrite`, is ignored, leaving whatever the other sources set.
+
+**Single connection:** flat environment variables are the shortest path.
 
 ```bash
 # Connection string (required).
@@ -48,36 +70,24 @@ export MCPMSSQL_CONNECTION_STRING="Server=127.0.0.1;User ID=sa;Password=<YourStr
 # Optional description for the default profile (tooling/AI discovery).
 export MCPMSSQL_DESCRIPTION="Primary connection"
 
-# Optional max rows per interactive query (default `500`; hard ceiling `1000`).
+# Optional caps, defaults shown.
 export MCPMSSQL_QUERY_MAX_ROWS="500"
-
-# Optional query timeout in seconds (default `30`; hard ceiling `300`).
-export MCPMSSQL_QUERY_COMMAND_TIMEOUT_SECONDS="60"
-
-# Optional max rows for snapshot queries (default `10000`; hard ceiling `50000`).
+export MCPMSSQL_QUERY_COMMAND_TIMEOUT_SECONDS="30"
 export MCPMSSQL_QUERY_SNAPSHOT_MAX_ROWS="10000"
-
-# Optional snapshot query timeout in seconds (default `120`; hard ceiling `300`).
 export MCPMSSQL_QUERY_SNAPSHOT_COMMAND_TIMEOUT_SECONDS="120"
-
-# Optional analyze timeout in seconds (default `300`; hard ceiling `600`).
 export MCPMSSQL_ANALYZE_COMMAND_TIMEOUT_SECONDS="300"
 
-# Optional: enable write commands (DDL/DML) via run_command (default `false`).
-# Also controls discovery — with no write-enabled profile, run_command is not advertised.
-# Soft guard only — prefer a db_datareader login for a hard read-only guarantee.
+# Optional write access, off by default; also controls whether run_command
+# is advertised at all. A soft guard, not a database permission — prefer a
+# db_datareader login for a hard read-only guarantee.
 export MCPMSSQL_ALLOW_WRITE="false"
-
-# Optional write command timeout in seconds (default `60`; hard ceiling `600`).
 export MCPMSSQL_WRITE_COMMAND_TIMEOUT_SECONDS="60"
 ```
 
-**Multiple connections:** Use the user-scoped `appsettings.json` file (recommended). Env vars also work via .NET host conventions (`MCPMSSQL__PROFILES__<NAME>__CONNECTIONSTRING`, etc.).
+**Multiple connections:** use the user-scoped `appsettings.json`, which keeps credentials out of the host's process environment.
 
 - Unix-like: `~/.config/mcp-mssql/appsettings.json`
 - Windows: `%USERPROFILE%\.config\mcp-mssql\appsettings.json`
-
-Example (`appsettings.json`):
 
 ```json
 {
@@ -113,16 +123,16 @@ Example (`appsettings.json`):
 }
 ```
 
-Values above a hard ceiling are clamped to it at startup, and each adjustment is logged as a warning on stderr.
+Profile names are case-insensitive, and the structured environment form splits on `__`, so `McpMssql__Profiles__WAREHOUSE__ConnectionString` is profile `warehouse`, field `ConnectionString`. A missing `appsettings.json` is fine — the server starts on whatever sources remain — but one that is not valid JSON fails startup.
 
-**Local development:** Store the connection string in user-secrets, then run with `DOTNET_ENVIRONMENT=Development` so secrets load.
+**Local development:** store the connection string in user-secrets, then run with `DOTNET_ENVIRONMENT=Development` so secrets and a working-directory `appsettings.json` load as extra sources.
 
 ```bash
 dotnet user-secrets set "MCPMSSQL_CONNECTION_STRING" "..." --project src/Alyio.McpMssql
 npx -y @modelcontextprotocol/inspector -e DOTNET_ENVIRONMENT=Development dotnet run --project src/Alyio.McpMssql
 ```
 
-**Azure SQL / Microsoft Entra ID:** This MCP server uses [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient), which supports Microsoft Entra (Azure AD) authentication. Set the `Authentication` property in the connection string to a supported mode (e.g. `Active Directory Default`, `Active Directory Managed Identity`, or `Active Directory Interactive`) when connecting to Azure SQL. See [Connect to Azure SQL with Microsoft Entra authentication and SqlClient](https://learn.microsoft.com/en-us/sql/connect/ado-net/sql/azure-active-directory-authentication) for all modes and details.
+**Connection string syntax:** the usual `Server=host,port;Database=db;User ID=...;Password=...;Encrypt=True;` keywords of [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient), which also supports Microsoft Entra (Azure AD) authentication: set `Authentication` to a supported mode (e.g. `Active Directory Default`, `Active Directory Managed Identity`, or `Active Directory Interactive`) when connecting to Azure SQL. See [Connect to Azure SQL with Microsoft Entra authentication and SqlClient](https://learn.microsoft.com/en-us/sql/connect/ado-net/sql/azure-active-directory-authentication) for all modes and details.
 
 ## Tools and resources
 
