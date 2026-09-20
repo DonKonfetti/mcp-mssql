@@ -1,4 +1,4 @@
-# MCP SQL Server Tool
+# MCP SQL Server
 
 <!-- mcp-name: io.github.alyiox/mcp-mssql -->
 
@@ -6,9 +6,9 @@
 [![NuGet Version](https://img.shields.io/nuget/v/Alyio.McpMssql.svg)](https://www.nuget.org/packages/Alyio.McpMssql)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server with schema discovery, parameterized SELECT **queries**, execution-plan **analysis**, and **opt-in writes** per profile. Profile-based configuration serves **multiple databases and servers** from one toolset deployment.
+A read-only-by-default [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server for Microsoft SQL Server that provides schema discovery, select-only **queries**, execution-plan **analysis**, opt-in **writes**, and profile-based access to **multiple servers** from a single toolset deployment.
 
-**Requirements:** .NET 8.0 or later runtime (the tool targets `net8.0` and `net10.0`), SQL Server, and a connection string. Building from source requires the .NET 10.0 SDK.
+**Requirements:** .NET 8.0 or later runtime (the tool targets `net8.0` and `net10.0`), SQL Server, and a connection string.
 
 ## Quick start
 
